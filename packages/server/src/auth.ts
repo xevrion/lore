@@ -47,6 +47,7 @@ interface SessionRow {
   avatar_key: string | null
   discord_id: string | null
   trusted: number
+  approved_at: string | null
 }
 
 export interface Session {
@@ -61,7 +62,7 @@ export async function lookupSession(db: D1Database, token: string): Promise<Sess
   const tokenHash = await hashToken(token)
   const row = await sql(db)`
     select s.token_hash, s.expires_at, u.id, u.name, u.role, u.color, u.avatar_key, u.discord_id,
-      u.trusted
+      u.trusted, u.approved_at
     from session s join user u on u.id = s.user_id
     where s.token_hash = ${tokenHash} and u.revoked_at is null
   `.first<SessionRow>()
@@ -80,6 +81,7 @@ export async function lookupSession(db: D1Database, token: string): Promise<Sess
       avatarKey: row.avatar_key,
       discordId: row.discord_id,
       trusted: row.trusted === 1,
+      approved: row.role !== "member" || row.approved_at !== null,
     },
     expiresAt: row.expires_at,
     refresh: expires - Date.now() < SESSION_TTL_MS - REFRESH_AFTER_MS,
@@ -140,6 +142,15 @@ export async function getSession(c: Context): Promise<SessionUser | null> {
 export async function requireUser(c: Context): Promise<SessionUser> {
   const user = await getSession(c)
   if (!user) throw new HTTPException(401, {message: "Sign in to do that"})
+  return user
+}
+
+// A pending member can sign in and see that they are waiting, nothing more.
+export async function requireApproved(c: Context): Promise<SessionUser> {
+  const user = await requireUser(c)
+  if (!user.approved) {
+    throw new HTTPException(403, {message: "Your account is waiting for approval"})
+  }
   return user
 }
 

@@ -148,37 +148,52 @@ above; Discord only changes how a friend proves it is them.
 
 For local development put both values in `.dev.vars` instead.
 
-## Optional: members from your Discord server
+## Optional: members
 
-Invites make admins, and admins can do anything. If you want the whole server to be
-able to contribute without handing everyone the keys, name the server:
+Invites make admins, and admins can do anything. If you want more people to be able to
+contribute without handing everyone the keys, open sign-up to members:
 
 ```jsonc
-"DISCORD_GUILD_ID": "123456789012345678",
+"MEMBER_SIGNUP": "open",
 ```
 
-Find the ID in Discord under Server Settings, Widget, or right-click the server name
-with developer mode on. Deploy again. From then on, anyone in that server can press
-"Continue with Discord" on the login page and gets in as a member, no invite needed.
-Discord login must already be set up for this to work.
+Deploy again. From then on, anyone with a Discord account can press "Continue with
+Discord" on the login page and gets in as a member. Discord login must already be
+set up for this to work.
 
-What a member can do:
+New members go through two gates:
+
+1. **Approval.** A fresh member can sign in but sees only a "waiting for approval"
+   note. The admin page shows how many are waiting, and `/admin/review` lists them
+   with Approve and Reject buttons. Reject deletes the account again.
+2. **Review.** An approved member's uploads wait in the queue on `/admin/review`
+   until an admin approves each one, and only then get a link. After ten approvals
+   the member is trusted and uploads go straight to the wall. Any admin can flip
+   that back per person.
+
+What a member can do once approved:
 
 - Upload within a quota, 200 MB and 20 uploads a day by default
   (`MEMBER_QUOTA_BYTES`, `MEMBER_DAILY_UPLOADS`), with GIFs capped at 5 MB.
 - Edit and delete only their own memes.
 - Nothing on the admin page.
 
-New members are reviewed: their uploads wait in a queue at the top of `/admin` until
-an admin approves them, and only then get a link. After ten approvals a member is
-trusted and uploads go straight to the wall. Any admin can flip that back per person.
-
 Everyone, signed in or not, can report a meme from its menu. Two reports from different
-addresses hide it until an admin approves or deletes it. And any admin can ban a
-member, which deletes everything they uploaded, kills every link to it and locks the
-Discord account out for good. Only the owner can ban another admin.
+addresses hide it until an admin approves or deletes it. Any admin can ban a member,
+which deletes everything they uploaded, kills every link to it and locks the Discord
+account out for good. Only the owner can ban another admin.
 
-Leave `DISCORD_GUILD_ID` empty and none of this exists: the instance stays invite-only.
+If you would rather only let people from one Discord server in, add its ID as well:
+
+```jsonc
+"DISCORD_GUILD_ID": "123456789012345678",
+```
+
+Find the ID in Discord under Server Settings, Widget, or right-click the server name
+with developer mode on. Accounts outside that server are turned away before the
+approval step.
+
+Leave `MEMBER_SIGNUP` unset and none of this exists: the instance stays invite-only.
 
 ## Local development
 

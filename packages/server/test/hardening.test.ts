@@ -162,3 +162,38 @@ describe("file cache", () => {
     expect([...new Uint8Array(await res.arrayBuffer())]).toEqual([...TINY_GIF.subarray(2, 5)])
   })
 })
+
+const searchIds = async (q: string) =>
+  (
+    (await (
+      await SELF.fetch(`${ORIGIN}/api/memes?q=${encodeURIComponent(q)}`)
+    ).json()) as MemeList
+  ).items.map((m) => m.id)
+
+describe("search index maintenance", () => {
+  it("indexes uploads, follows edits and forgets deletions", async () => {
+    const cookie = await loginAsOwner()
+    const res = await upload(cookie, TINY_PNG, "idx.png", {
+      title: "zebra crossing",
+      tags: "stripes",
+    })
+    const meme = (await res.json()) as Meme
+    expect(await searchIds("zebra")).toContain(meme.id)
+    expect(await searchIds("stripes")).toContain(meme.id)
+
+    await SELF.fetch(`${ORIGIN}/api/memes/${meme.id}`, {
+      method: "PATCH",
+      headers: {cookie, "content-type": "application/json"},
+      body: JSON.stringify({title: "giraffe parade"}),
+    })
+    expect(await searchIds("giraffe")).toContain(meme.id)
+    expect(await searchIds("zebra")).not.toContain(meme.id)
+
+    await SELF.fetch(`${ORIGIN}/api/memes/${meme.id}`, {
+      method: "DELETE",
+      headers: {cookie: owner},
+    })
+    expect(await searchIds("giraffe")).not.toContain(meme.id)
+    expect(await searchIds("stripes")).not.toContain(meme.id)
+  })
+})

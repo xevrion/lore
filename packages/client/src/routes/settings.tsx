@@ -6,7 +6,7 @@ import type {ReactNode} from "react"
 import {useNavigate, useSearchParams} from "react-router"
 import {toast} from "sonner"
 
-import {api, meQueryKey, useAuthConfig, useMe} from "@/api"
+import {api, isPending as awaitingApproval, meQueryKey, useAuthConfig, useMe} from "@/api"
 import {AvatarPicker} from "@/components/avatar-picker"
 import {DiscordMark} from "@/components/discord-mark"
 import {Header} from "@/components/header"
@@ -30,6 +30,12 @@ export default function Settings() {
       <Header />
       <main className="mx-auto w-full max-w-lg px-4 py-10 sm:px-6">
         <h1 className="mb-8 text-xl font-semibold tracking-tight">Settings</h1>
+        {awaitingApproval(me) && (
+          <p className="mb-8 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
+            Your account is waiting for an admin to approve it. You can set your name and avatar
+            in the meantime.
+          </p>
+        )}
         <ProfileForm key={me.id} me={me} />
         <Discord me={me} />
         <Appearance />

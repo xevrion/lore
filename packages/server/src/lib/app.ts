@@ -12,6 +12,8 @@ export interface SessionUser {
   avatarKey: string | null
   discordId: string | null
   trusted: boolean
+  // Staff are always approved; members earn it from an admin.
+  approved: boolean
 }
 
 export const isStaff = (user: SessionUser) => user.role !== "member"
@@ -58,10 +60,13 @@ export function requireSameOrigin(c: Context) {
 export const discordEnabled = (env: Bindings) =>
   Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET)
 
-// Members exist only when a Discord server is named; otherwise the instance
-// stays invite-only.
+// Open sign-up: any Discord account can become a member, pending approval.
+// Without it the instance stays invite-only.
 export const membersEnabled = (env: Bindings) =>
-  discordEnabled(env) && Boolean(env.DISCORD_GUILD_ID)
+  discordEnabled(env) && env.MEMBER_SIGNUP === "open"
+
+// Optional extra gate on top of open sign-up: the account must be in this server.
+export const guildRequired = (env: Bindings) => Boolean(env.DISCORD_GUILD_ID)
 
 export const memberQuotaBytes = (env: Bindings) =>
   Number(env.MEMBER_QUOTA_BYTES) || 200 * 1024 * 1024

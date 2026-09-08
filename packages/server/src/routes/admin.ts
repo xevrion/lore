@@ -14,6 +14,7 @@ import {
   type CreatedInvite,
   type MemeList,
   type PendingInvite,
+  type PendingMember,
   type Role,
 } from "../lib/types"
 import {validate} from "../lib/validate"
@@ -36,12 +37,14 @@ interface UserRow {
   pending_count: number
   last_seen_at: string | null
   discord_id: string | null
+  approved_at: string | null
 }
 
 interface Totals {
   memes: number
   pending: number
   hidden: number
+  pending_members: number
   storage_bytes: number
   copies_total: number
   views_total: number
@@ -54,8 +57,8 @@ const reviewSchema = z.object({
 
 async function findUser(c: Context, id: string) {
   const user = await sql(c.env.DB)`
-    select id, role, avatar_key from user where id = ${id}
-  `.first<{id: string; role: Role; avatar_key: string | null}>()
+    select id, role, avatar_key, approved_at from user where id = ${id}
+  `.first<{id: string; role: Role; avatar_key: string | null; approved_at: string | null}>()
   if (!user) throw new HTTPException(404, {message: "User not found"})
   return user
 }
@@ -87,7 +90,9 @@ export default app()
           sum(case when status = 'pending' then 1 else 0 end) as pending,
           sum(case when status = 'hidden' then 1 else 0 end) as hidden,
           coalesce(sum(size + thumb_size), 0) as storage_bytes,
-          coalesce(sum(copies), 0) as copies_total, coalesce(sum(views), 0) as views_total
+          coalesce(sum(copies), 0) as copies_total, coalesce(sum(views), 0) as views_total,
+          (select count(*) from user where role = 'member' and approved_at is null
+            and revoked_at is null) as pending_members
         from meme`),
       c.env.DB.prepare("select count(*) as n from meme where created_at > ?").bind(weekAgo),
       c.env.DB.prepare(
@@ -108,6 +113,7 @@ export default app()
       uploadsLast7d: (recent?.results[0] as {n: number} | undefined)?.n ?? 0,
       pendingCount: t.pending ?? 0,
       hiddenCount: t.hidden ?? 0,
+      pendingMembers: t.pending_members ?? 0,
       topMemes: ((top?.results ?? []) as MemeRow[]).map((row) => toMeme(origin(c), row)),
       topUploaders: (
         (uploaders?.results ?? []) as {
@@ -134,7 +140,7 @@ export default app()
     await requireStaff(c)
     const {results} = await sql(c.env.DB)`
       select u.id, u.name, u.role, u.color, u.avatar_key, u.created_at, u.revoked_at,
-        u.banned_at, u.trusted, u.discord_id,
+        u.banned_at, u.trusted, u.discord_id, u.approved_at,
         (select count(*) from meme where uploader_id = u.id) as upload_count,
         (select coalesce(sum(size + thumb_size), 0) from meme where uploader_id = u.id) as bytes_used,
         (select count(*) from meme where uploader_id = u.id and status = 'pending') as pending_count,
@@ -153,8 +159,51 @@ export default app()
       bannedAt: u.banned_at,
       bytesUsed: u.bytes_used,
       pendingCount: u.pending_count,
+      approvedAt: u.role === "member" ? u.approved_at : u.created_at,
     }))
     return c.json(users)
+  })
+
+  .get("/admin/members/pending", async (c) => {
+    await requireStaff(c)
+    const {results} = await sql(c.env.DB)`
+      select id, name, color, avatar_key, discord_id, created_at from user
+      where role = 'member' and approved_at is null and revoked_at is null
+      order by created_at asc
+    `.all<Pick<UserRow, "id" | "name" | "color" | "avatar_key" | "discord_id" | "created_at">>()
+    const pending: PendingMember[] = results.map((u) => ({
+      ...toUser(origin(c), {id: u.id, name: u.name, color: u.color, avatarKey: u.avatar_key}),
+      discordLinked: u.discord_id !== null,
+      createdAt: u.created_at,
+    }))
+    return c.json(pending)
+  })
+
+  .post("/admin/users/:id/approve", async (c) => {
+    await requireStaff(c)
+    const target = await findUser(c, c.req.param("id"))
+    if (target.role !== "member") {
+      throw new HTTPException(400, {message: "Only members need approval"})
+    }
+    await sql(c.env.DB)`
+      update user set approved_at = coalesce(approved_at, ${now()}) where id = ${target.id}
+    `.run()
+    return c.body(null, 204)
+  })
+
+  // Rejecting someone who never got in leaves nothing behind: no memes exist
+  // yet, so the row itself goes and the list stays clean. Their Discord id is
+  // free to try again, which is fine; approval is the gate.
+  .post("/admin/users/:id/reject", async (c) => {
+    await requireStaff(c)
+    const target = await findUser(c, c.req.param("id"))
+    if (target.role !== "member" || target.approved_at !== null) {
+      throw new HTTPException(400, {message: "Only unapproved members can be rejected"})
+    }
+    await deleteUserSessions(c.env.DB, target.id)
+    await sql(c.env.DB)`delete from user where id = ${target.id}`.run()
+    if (target.avatar_key) await c.env.BUCKET.delete(target.avatar_key)
+    return c.body(null, 204)
   })
 
   // Oldest first, so the longest wait is dealt with first. Same keyset cursor

@@ -4,7 +4,7 @@ import {afterEach, beforeAll, describe, expect, it} from "vitest"
 import {createSession} from "../src/auth"
 import app from "../src/index"
 import {sql} from "../src/lib/sql"
-import type {AdminUser, Me, Meme, MemeList} from "../src/lib/types"
+import type {AdminStats, AdminUser, Me, Meme, MemeList, PendingMember} from "../src/lib/types"
 import {discordHttp} from "../src/routes/discord"
 import {cookieOf, loginAsOwner, ORIGIN, TINY_GIF, TINY_PNG, upload} from "./helpers"
 
@@ -12,12 +12,14 @@ let owner = ""
 let counter = 0
 
 // A member row plus a session, without going through Discord each time.
-async function memberSession(trusted = 0) {
+// Approved by default; the approval flow has its own tests.
+async function memberSession(trusted = 0, approved = true) {
   const id = `m${++counter}${Date.now().toString(36)}`
+  const created = new Date().toISOString()
   await sql(env.DB)`
-    insert into user (id, name, role, color, created_at, discord_id, trusted)
-    values (${id}, ${`member ${id}`}, 'member', '#8b5cf6', ${new Date().toISOString()},
-      ${`d-${id}`}, ${trusted})
+    insert into user (id, name, role, color, created_at, discord_id, trusted, approved_at)
+    values (${id}, ${`member ${id}`}, 'member', '#8b5cf6', ${created},
+      ${`d-${id}`}, ${trusted}, ${approved ? created : null})
   `.run()
   const {token} = await createSession(env.DB, id, null)
   return {id, cookie: `lore_session=${token}`}
@@ -71,7 +73,7 @@ describe("members", () => {
     expect(((await me.json()) as Me).quota).toBeNull()
   })
 
-  it("signs a Discord server member in as an untrusted member", async () => {
+  it("signs a Discord user in as an unapproved, untrusted member", async () => {
     const {state, oauthCookie} = await start()
     mockDiscord("5001", ["other", "guild-1"])
     const res = await SELF.fetch(
@@ -86,14 +88,18 @@ describe("members", () => {
       await SELF.fetch(`${ORIGIN}/api/auth/me`, {headers: {cookie: sessionCookieOf(res)}})
     ).json()) as Me
     expect(me.role).toBe("member")
+    expect(me.approved).toBe(false)
     expect(me.quota).toMatchObject({bytesUsed: 0, bytesLimit: 4096, uploadsLimit: 3})
     const row = await sql(env.DB)`select trusted from user where id = ${me.id}`.first<{
       trusted: number
     }>()
     expect(row?.trusted).toBe(0)
+    // Signed in, but nothing works until an admin approves.
+    const blocked = await upload(sessionCookieOf(res), TINY_GIF, "early.gif")
+    expect(blocked.status).toBe(403)
   })
 
-  it("turns away Discord users outside the server, and everyone when no server is set", async () => {
+  it("turns away accounts outside the server when one is required, and everyone when sign-up is off", async () => {
     const outside = await start()
     mockDiscord("5002", ["other"])
     const res = await SELF.fetch(
@@ -102,15 +108,77 @@ describe("members", () => {
     )
     expect(res.headers.get("location")).toBe("/login?error=not-invited")
 
+    const anyGuild = await start()
+    mockDiscord("5004", ["other"])
+    const welcomed = await app.request(
+      `${ORIGIN}/api/auth/discord/callback?code=abc&state=${anyGuild.state}`,
+      {redirect: "manual", headers: {cookie: anyGuild.oauthCookie}},
+      {...env, DISCORD_GUILD_ID: ""},
+      createExecutionContext(),
+    )
+    expect(welcomed.headers.get("location")).toBe("/")
+
     const off = await start()
     mockDiscord("5003", ["guild-1"])
     const refused = await app.request(
       `${ORIGIN}/api/auth/discord/callback?code=abc&state=${off.state}`,
       {redirect: "manual", headers: {cookie: off.oauthCookie}},
-      {...env, DISCORD_GUILD_ID: ""},
+      {...env, MEMBER_SIGNUP: ""},
       createExecutionContext(),
     )
     expect(refused.headers.get("location")).toBe("/login?error=not-invited")
+  })
+
+  it("approves a waiting member, after which uploads go to the review queue", async () => {
+    const waiting = await memberSession(0, false)
+    const me = (await (
+      await SELF.fetch(`${ORIGIN}/api/auth/me`, {headers: {cookie: waiting.cookie}})
+    ).json()) as Me
+    expect(me.approved).toBe(false)
+    expect((await upload(waiting.cookie, TINY_GIF, "soon.gif")).status).toBe(403)
+
+    const pending = (await (
+      await SELF.fetch(`${ORIGIN}/api/admin/members/pending`, {headers: {cookie: owner}})
+    ).json()) as PendingMember[]
+    expect(pending.map((m) => m.id)).toContain(waiting.id)
+    const stats = (await (
+      await SELF.fetch(`${ORIGIN}/api/admin/stats`, {headers: {cookie: owner}})
+    ).json()) as AdminStats
+    expect(stats.pendingMembers).toBeGreaterThanOrEqual(1)
+
+    const approved = await SELF.fetch(`${ORIGIN}/api/admin/users/${waiting.id}/approve`, {
+      method: "POST",
+      headers: {cookie: owner},
+    })
+    expect(approved.status).toBe(204)
+    const after = (await (
+      await SELF.fetch(`${ORIGIN}/api/auth/me`, {headers: {cookie: waiting.cookie}})
+    ).json()) as Me
+    expect(after.approved).toBe(true)
+    const res = await upload(waiting.cookie, TINY_GIF, "first.gif")
+    expect(res.status).toBe(201)
+    expect(((await res.json()) as Meme).status).toBe("pending")
+  })
+
+  it("rejects a waiting member, removing the row and the session", async () => {
+    const waiting = await memberSession(0, false)
+    const rejected = await SELF.fetch(`${ORIGIN}/api/admin/users/${waiting.id}/reject`, {
+      method: "POST",
+      headers: {cookie: owner},
+    })
+    expect(rejected.status).toBe(204)
+    expect(
+      (await SELF.fetch(`${ORIGIN}/api/auth/me`, {headers: {cookie: waiting.cookie}})).status,
+    ).toBe(401)
+    const row = await sql(env.DB)`select id from user where id = ${waiting.id}`.first()
+    expect(row).toBeNull()
+
+    const settled = await memberSession(0, true)
+    const refused = await SELF.fetch(`${ORIGIN}/api/admin/users/${settled.id}/reject`, {
+      method: "POST",
+      headers: {cookie: owner},
+    })
+    expect(refused.status).toBe(400)
   })
 })
 

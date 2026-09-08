@@ -7,6 +7,7 @@ import type {
   Meme,
   MemeList,
   PendingInvite,
+  PendingMember,
   Sort,
 } from "@lore/server/types"
 import {useQuery} from "@tanstack/react-query"
@@ -87,10 +88,30 @@ export const api = {
     request<void>(`/admin/users/${id}/trust`, json("POST", {trusted})),
   banUser: (id: string) =>
     request<{deleted: number}>(`/admin/users/${id}/ban`, {method: "POST"}),
+  pendingMembers: () => request<PendingMember[]>("/admin/members/pending"),
+  approveUser: (id: string) => request<void>(`/admin/users/${id}/approve`, {method: "POST"}),
+  rejectUser: (id: string) => request<void>(`/admin/users/${id}/reject`, {method: "POST"}),
 }
 
 // Staff are owners and admins. Members upload within a quota and only touch their own memes.
 export const isStaff = (me: Me | null | undefined) => Boolean(me && me.role !== "member")
+
+// A member an admin has not approved yet can sign in but do nothing else.
+export const isPending = (me: Me | null | undefined) => Boolean(me && !me.approved)
+
+// How many members and memes are waiting on staff. Polled on focus so the menu
+// badge stays honest without a websocket.
+export function useReviewCount() {
+  const {data: me} = useMe()
+  return useQuery({
+    queryKey: ["admin", "stats"],
+    queryFn: api.adminStats,
+    enabled: isStaff(me),
+    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000,
+    select: (s) => s.pendingMembers + s.pendingCount + s.hiddenCount,
+  })
+}
 
 // Fire and forget. sendBeacon survives navigation and never blocks the copy toast.
 export function recordCopy(id: string) {

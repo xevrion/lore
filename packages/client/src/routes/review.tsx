@@ -1,13 +1,13 @@
-import type {Meme} from "@lore/server/types"
+import type {Meme, PendingMember} from "@lore/server/types"
 import {LIMITS} from "@lore/server/types"
-import {useInfiniteQuery, useMutation, useQueryClient} from "@tanstack/react-query"
+import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
 import {ArrowLeft, Flag} from "lucide-react"
 import {useEffect, useRef, useState} from "react"
 import {Link, useNavigate} from "react-router"
 import {toast} from "sonner"
 
 import {api, isStaff, useMe} from "@/api"
-import {AddedBy} from "@/components/added-by"
+import {AddedBy, UserAvatar} from "@/components/added-by"
 import {Header} from "@/components/header"
 import {
   AlertDialog,
@@ -47,12 +47,107 @@ export default function Review() {
         </Link>
         <h1 className="text-xl font-semibold tracking-tight">Review</h1>
         <p className="mt-1 mb-6 text-sm text-muted-foreground">
-          New members' uploads wait here until approved. Anything with {LIMITS.hideAfterReports}{" "}
-          reports lands here too. Oldest first.
+          New members wait here for approval, then their uploads wait here until approved.
+          Anything with {LIMITS.hideAfterReports} reports lands here too. Oldest first.
         </p>
+        <PendingMembers />
         <Queue />
       </main>
     </>
+  )
+}
+
+function PendingMembers() {
+  const queryClient = useQueryClient()
+  const members = useQuery({
+    queryKey: ["admin", "members", "pending"],
+    queryFn: api.pendingMembers,
+  })
+  const [rejecting, setRejecting] = useState<PendingMember | null>(null)
+  const refresh = () => void queryClient.invalidateQueries({queryKey: ["admin"]})
+  const approve = useMutation({
+    mutationFn: api.approveUser,
+    onSuccess: () => {
+      toast("Approved")
+      refresh()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const reject = useMutation({
+    mutationFn: api.rejectUser,
+    onSuccess: () => {
+      toast("Rejected")
+      setRejecting(null)
+      refresh()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  if (!members.data || members.data.length === 0) return null
+
+  return (
+    <section className="mb-8 grid gap-3">
+      <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        Members waiting
+      </h2>
+      <ul className="divide-y rounded-lg border">
+        {members.data.map((m) => (
+          <li key={m.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
+            <UserAvatar user={m} size="md" />
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2">
+                <span className="truncate font-medium">{m.name}</span>
+                {m.discordLinked && <Badge variant="outline">Discord</Badge>}
+              </p>
+              <p className="text-xs text-muted-foreground" title={m.createdAt}>
+                signed up {formatRelative(m.createdAt)}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="pressable"
+                disabled={approve.isPending}
+                onClick={() => approve.mutate(m.id)}
+              >
+                Approve
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setRejecting(m)}>
+                Reject
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <AlertDialog
+        open={rejecting !== null}
+        onOpenChange={(open) => !open && setRejecting(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject {rejecting?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Their account is removed and they are signed out. They can sign in again to ask
+              once more.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={reject.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                if (rejecting) reject.mutate(rejecting.id)
+              }}
+            >
+              Reject
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
   )
 }
 

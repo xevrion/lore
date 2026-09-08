@@ -39,6 +39,7 @@ export const me = async (c: Context, user: SessionUser): Promise<Me> => ({
   ...toUser(origin(c), user),
   role: user.role,
   discordLinked: user.discordId !== null,
+  approved: user.approved,
   quota: isStaff(user) ? null : await quotaFor(c, user.id),
 })
 
@@ -164,6 +165,7 @@ export default app()
           avatarKey: owner.avatar_key,
           discordId: owner.discord_id,
           trusted: true,
+          approved: true,
         }),
       )
     },
@@ -199,6 +201,7 @@ export default app()
       avatarKey: null,
       discordId: null,
       trusted: true,
+      approved: true,
     }
     await consumeInvite(c.env.DB, tokenHash)
     if (avatar instanceof File && avatar.size > 0) {

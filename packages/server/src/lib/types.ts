@@ -26,6 +26,8 @@ export interface Quota {
 export interface Me extends UserSummary {
   role: Role
   discordLinked: boolean
+  // False only for a member an admin has not approved yet.
+  approved: boolean
   // Null for staff, who have no quota.
   quota: Quota | null
 }
@@ -67,11 +69,17 @@ export interface AdminUser extends UserSummary {
   bannedAt: string | null
   bytesUsed: number
   pendingCount: number
+  approvedAt: string | null
+}
+
+export interface PendingMember extends UserSummary {
+  discordLinked: boolean
+  createdAt: string
 }
 
 export interface AuthConfig {
   discord: boolean
-  // True when members of the configured Discord server can sign in without an invite.
+  // True when any Discord account can sign in as a member, pending approval.
   members: boolean
 }
 
@@ -95,6 +103,7 @@ export interface AdminStats {
   uploadsLast7d: number
   pendingCount: number
   hiddenCount: number
+  pendingMembers: number
   topMemes: Meme[]
   topUploaders: {user: UserSummary; count: number}[]
 }

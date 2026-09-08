@@ -1,9 +1,10 @@
 import {HTTPException} from "hono/http-exception"
 import {z} from "zod"
 
-import {getSession, hashToken, requireUser} from "../auth"
+import {getSession, hashToken, requireApproved} from "../auth"
 import {app, isStaff, now, origin, storageCap, type Context, type SessionUser} from "../lib/app"
 import {decodeCursor, encodeCursor} from "../lib/cursor"
+import {indexMeme} from "../lib/fts"
 import {uniqueMemeId} from "../lib/id"
 import {dimensions, parseDimensions, sniff, withinLimits} from "../lib/image"
 import {MEME_SELECT, toMeme, type MemeRow} from "../lib/meme"
@@ -168,7 +169,7 @@ export default app()
   })
 
   .post("/memes", async (c) => {
-    const user = await requireUser(c)
+    const user = await requireApproved(c)
     const form = await c.req.formData()
     const file = form.get("file")
     if (!(file instanceof File) || file.size === 0) {
@@ -236,22 +237,24 @@ export default app()
       values (${id}, ${key}, ${thumbKey}, ${type.ext}, ${type.mime}, ${size.width}, ${size.height},
         ${bytes.length}, ${thumbSize}, ${title}, ${tags}, ${user.id}, ${now()}, ${status})
     `.run()
+    await indexMeme(c.env.DB, {id, title, tags})
     return c.json(toMeme(origin(c), await findMeme(c, id)), 201)
   })
 
   .patch("/memes/:id", validate("json", patchSchema), async (c) => {
-    const user = await requireUser(c)
+    const user = await requireApproved(c)
     const id = c.req.param("id")
     const body = c.req.valid("json")
     const current = await findOwnOrStaff(c, user, id)
     const title = body.title ?? current.title
     const tags = body.tags === undefined ? current.tags : normalizeTags(body.tags)
     await sql(c.env.DB)`update meme set title = ${title}, tags = ${tags} where id = ${id}`.run()
+    await indexMeme(c.env.DB, {id, title, tags})
     return c.json(toMeme(origin(c), await findMeme(c, id)))
   })
 
   .delete("/memes/:id", async (c) => {
-    const user = await requireUser(c)
+    const user = await requireApproved(c)
     const row = await findOwnOrStaff(c, user, c.req.param("id"))
     // The gone placeholder at the old URL is served with a short max-age.
     await deleteMemes(c, [row])

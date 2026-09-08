@@ -5,7 +5,7 @@ import {useEffect, useRef} from "react"
 import {Link, useNavigate} from "react-router"
 import {toast} from "sonner"
 
-import {api, meQueryKey, useMe} from "@/api"
+import {api, meQueryKey, useMe, useReviewCount} from "@/api"
 import {UserAvatar} from "@/components/added-by"
 import {Button} from "@/components/ui/button"
 import {
@@ -158,6 +158,7 @@ function SortToggle({sort, onSort}: {sort: Sort; onSort: (s: Sort) => void}) {
 
 function UserMenu() {
   const {data: me} = useMe()
+  const {data: waiting = 0} = useReviewCount()
   const {theme, toggle} = useTheme()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -201,6 +202,11 @@ function UserMenu() {
             <DropdownMenuItem onSelect={() => void navigate("/admin/review")}>
               <Flag aria-hidden />
               Review
+              {waiting > 0 && (
+                <span className="ml-auto rounded-full bg-amber-500/15 px-1.5 text-[11px] font-medium text-amber-500 tabular-nums">
+                  {waiting}
+                </span>
+              )}
             </DropdownMenuItem>
           </>
         )}

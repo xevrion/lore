@@ -25,9 +25,12 @@
     // Optional Discord sign-in. Pair it with the DISCORD_CLIENT_SECRET secret,
     // see docs/install.md. Remove the line to turn Discord login off.
     "DISCORD_CLIENT_ID": "1546925854268067980",
-    // Optional: let everyone in this Discord server sign in as a member without an
-    // invite. Members get a storage quota and their first uploads are reviewed.
-    // Leave empty to stay invite-only.
+    // "open": anyone with a Discord account can sign in as a member. They wait for
+    // an admin's approval, then their first uploads are reviewed. Anything else
+    // keeps the instance invite-only.
+    "MEMBER_SIGNUP": "open",
+    // Optional extra gate for open sign-up: the account must also be in this
+    // Discord server. Leave empty to accept any Discord account.
     "DISCORD_GUILD_ID": "",
     // Per-member limits. Defaults are 200 MiB and 20 uploads a day.
     "MEMBER_QUOTA_BYTES": "209715200",

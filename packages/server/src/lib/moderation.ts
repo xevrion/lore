@@ -1,5 +1,6 @@
 import type {Context} from "./app"
 import {cacheOrigin, memberDailyUploads, memberQuotaBytes} from "./app"
+import {unindexMemes} from "./fts"
 import type {MemeRow} from "./meme"
 import {sql} from "./sql"
 import type {Quota} from "./types"
@@ -44,6 +45,10 @@ export async function deleteMemes(
     c.env.DB.prepare(`delete from meme where id in (${rows.map(() => "?").join(",")})`)
       .bind(...rows.map((r) => r.id))
       .run(),
+    unindexMemes(
+      c.env.DB,
+      rows.map((r) => r.id),
+    ),
     ...rows.map((row) => purgeMeme(c, row)),
   ])
 }

@@ -2,10 +2,11 @@ import type {Sort} from "@lore/server/types"
 import {lazy, Suspense, useCallback, useEffect, useState} from "react"
 import {useSearchParams} from "react-router"
 
-import {useMe} from "@/api"
+import {isPending, useMe} from "@/api"
 import {DropOverlay} from "@/components/drop-overlay"
 import {Header} from "@/components/header"
 import {MemeGrid} from "@/components/meme-grid"
+import {WaitingForApproval} from "@/components/waiting-for-approval"
 import {useDebounced} from "@/lib/hooks"
 import {useUploads} from "@/lib/uploads"
 
@@ -41,7 +42,8 @@ export default function Gallery() {
     [setParams],
   )
 
-  const canUpload = Boolean(me)
+  const pending = isPending(me)
+  const canUpload = Boolean(me) && !pending
   const {add, setOpen} = uploads
 
   useEffect(() => {
@@ -60,6 +62,8 @@ export default function Gallery() {
     window.addEventListener("paste", onPaste)
     return () => window.removeEventListener("paste", onPaste)
   }, [canUpload, add])
+
+  if (pending) return <WaitingForApproval />
 
   return (
     <>

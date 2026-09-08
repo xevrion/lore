@@ -302,6 +302,8 @@ function main() {
       `insert into meme (id, key, thumb_key, ext, mime, width, height, size, title, tags, uploader_id, created_at, copies, views)
        values (${sqlString(s.id)}, ${sqlString(`${s.id}.${s.ext}`)}, null, '${s.ext}', '${mime}', ${s.width}, ${s.height}, ${s.bytes.length}, ${sqlString(s.title)}, ${sqlString(s.tags)}, 'owner', '${createdAt}', ${s.copies}, ${s.copies * 3})
        on conflict (id) do nothing`,
+      `delete from meme_fts where id = ${sqlString(s.id)}`,
+      `insert into meme_fts (id, title, tags) values (${sqlString(s.id)}, ${sqlString(s.title)}, ${sqlString(s.tags)})`,
     )
   }
   console.log("inserting rows")

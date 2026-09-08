@@ -64,21 +64,20 @@ export default function Admin() {
 function ReviewCard() {
   const stats = useQuery({queryKey: ["admin", "stats"], queryFn: api.adminStats})
   if (!stats.data) return null
-  const {pendingCount, hiddenCount} = stats.data
-  if (pendingCount === 0 && hiddenCount === 0) return null
+  const {pendingMembers, pendingCount, hiddenCount} = stats.data
+  if (pendingMembers === 0 && pendingCount === 0 && hiddenCount === 0) return null
+  const parts = [
+    pendingMembers > 0 &&
+      `${pendingMembers} ${pendingMembers === 1 ? "member" : "members"} waiting`,
+    pendingCount > 0 &&
+      `${pendingCount} ${pendingCount === 1 ? "meme" : "memes"} waiting for review`,
+    hiddenCount > 0 && `${hiddenCount} hidden by reports`,
+  ].filter((p): p is string => Boolean(p))
   return (
     <div className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
       <p className="inline-flex items-center gap-2">
         <Flag className="size-4 text-amber-500" aria-hidden />
-        <span>
-          {pendingCount > 0 && (
-            <>
-              {pendingCount} {pendingCount === 1 ? "meme" : "memes"} waiting for review
-            </>
-          )}
-          {pendingCount > 0 && hiddenCount > 0 && ", "}
-          {hiddenCount > 0 && <>{hiddenCount} hidden by reports</>}
-        </span>
+        <span>{parts.join(", ")}</span>
       </p>
       <Link to="/admin/review" className={buttonVariants({size: "sm", className: "pressable"})}>
         Review
@@ -458,7 +457,7 @@ function People({ownerId, isOwner}: {ownerId: string; isOwner: boolean}) {
       </Section>
       <Section
         title="Members"
-        body={`People from the Discord server. Their first ${LIMITS.trustAfterApprovals} approved uploads are reviewed, then they are trusted automatically.`}
+        body={`Signed in with Discord and approved by an admin. Their first ${LIMITS.trustAfterApprovals} approved uploads are reviewed, then they are trusted automatically.`}
       >
         {members.length === 0 ? (
           <p className="text-sm text-muted-foreground">No members yet.</p>

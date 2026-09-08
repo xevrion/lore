@@ -115,7 +115,8 @@ export default function Login() {
             </a>
             {config.members && !oauthError && (
               <p className="text-center text-xs text-muted-foreground">
-                Members of the Discord server can sign in directly.
+                Anyone with a Discord account can join. An admin approves new members before
+                they can upload.
               </p>
             )}
             {oauthError && (

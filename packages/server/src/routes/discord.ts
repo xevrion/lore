@@ -4,6 +4,7 @@ import {getSession, hashToken, newToken} from "../auth"
 import {
   app,
   discordEnabled,
+  guildRequired,
   membersEnabled,
   now,
   origin,
@@ -52,6 +53,7 @@ interface UserRow {
   discord_id: string | null
   revoked_at: string | null
   trusted: number
+  approved_at: string | null
 }
 
 const toSessionUser = (row: UserRow): SessionUser => ({
@@ -62,10 +64,11 @@ const toSessionUser = (row: UserRow): SessionUser => ({
   avatarKey: row.avatar_key,
   discordId: row.discord_id,
   trusted: row.trusted === 1,
+  approved: row.role !== "member" || row.approved_at !== null,
 })
 
-// The token never touches storage. It is used for one profile read and, when
-// members are enabled, one look at the guild list.
+// The token never touches storage. It is used for one profile read and, when a
+// server is required, one look at the guild list.
 async function fetchDiscordUser(
   c: Context,
   code: string,
@@ -159,7 +162,7 @@ export default app()
     const params = new URLSearchParams({
       client_id: c.env.DISCORD_CLIENT_ID ?? "",
       response_type: "code",
-      scope: membersEnabled(c.env) ? "identify guilds" : "identify",
+      scope: guildRequired(c.env) ? "identify guilds" : "identify",
       redirect_uri: redirectUri(c),
       state: state.state,
       prompt: "none",
@@ -178,7 +181,7 @@ export default app()
     const discord = fetched.user
 
     const existing = await sql(c.env.DB)`
-      select id, name, role, color, avatar_key, discord_id, revoked_at, trusted
+      select id, name, role, color, avatar_key, discord_id, revoked_at, trusted, approved_at
       from user where discord_id = ${discord.id}
     `.first<UserRow>()
 
@@ -200,14 +203,17 @@ export default app()
       return c.redirect("/")
     }
 
-    // An invite makes an admin. Without one, being in the Discord server makes a
-    // member, who starts untrusted and goes through the review queue.
+    // An invite makes an admin. Without one, open sign-up makes a member who
+    // waits for an admin's approval, then for the review queue until trusted.
     const tokenHash = saved.invite ? await hashToken(saved.invite) : null
     const invite = tokenHash ? await findInvite(c.env.DB, tokenHash) : null
     const invited =
       invite !== null && !invite.used_at && new Date(invite.expires_at).getTime() > Date.now()
-    if (!invited && !(membersEnabled(c.env) && (await inGuild(c, fetched.token)))) {
-      return c.redirect("/login?error=not-invited")
+    if (!invited) {
+      if (!membersEnabled(c.env)) return c.redirect("/login?error=not-invited")
+      if (guildRequired(c.env) && !(await inGuild(c, fetched.token))) {
+        return c.redirect("/login?error=not-invited")
+      }
     }
     if (invited && tokenHash) await consumeInvite(c.env.DB, tokenHash)
 
@@ -219,12 +225,14 @@ export default app()
       avatarKey: null,
       discordId: discord.id,
       trusted: invited,
+      approved: invited,
     }
     user.avatarKey = await copyAvatar(c, user.id, discord)
     await sql(c.env.DB)`
-      insert into user (id, name, role, avatar_key, color, created_at, discord_id, trusted)
+      insert into user (id, name, role, avatar_key, color, created_at, discord_id, trusted,
+        approved_at)
       values (${user.id}, ${user.name}, ${user.role}, ${user.avatarKey}, ${user.color}, ${now()},
-        ${user.discordId}, ${invited ? 1 : 0})
+        ${user.discordId}, ${invited ? 1 : 0}, ${invited ? now() : null})
     `.run()
     if (invited && tokenHash) await markInviteUsedBy(c.env.DB, tokenHash, user.id)
     await signIn(c, user)
