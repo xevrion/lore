@@ -1,0 +1,398 @@
+import type {AdminUser, CreatedInvite, Meme} from "@lore/server/types"
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
+import {Check, Copy, ExternalLink} from "lucide-react"
+import {useEffect, useState} from "react"
+import type {ReactNode} from "react"
+import {useNavigate} from "react-router"
+import {toast} from "sonner"
+
+import {api, useMe} from "@/api"
+import {UserAvatar} from "@/components/added-by"
+import {Header} from "@/components/header"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {Badge} from "@/components/ui/badge"
+import {Button} from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {Skeleton} from "@/components/ui/skeleton"
+import {copyText} from "@/lib/clipboard"
+import {formatBytes, formatCount, formatDate, formatRelative} from "@/lib/format"
+import {cn} from "@/lib/utils"
+
+const FREE_TIER_BYTES = 10 * 1024 * 1024 * 1024
+
+export default function Admin() {
+  const {data: me, isPending} = useMe()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!isPending && me?.role !== "owner") void navigate("/", {replace: true})
+  }, [isPending, me, navigate])
+
+  if (me?.role !== "owner") return null
+
+  return (
+    <>
+      <Header />
+      <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
+        <h1 className="mb-8 text-xl font-semibold tracking-tight">Admin</h1>
+        <Overview />
+        <Invites />
+        <Admins ownerId={me.id} />
+      </main>
+    </>
+  )
+}
+
+function Section({
+  title,
+  body,
+  action,
+  children,
+}: {
+  title: string
+  body?: string
+  action?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="grid gap-5 border-t py-8 first:border-t-0 first:pt-0">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-medium">{title}</h2>
+          {body && <p className="text-sm text-muted-foreground">{body}</p>}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function Overview() {
+  const stats = useQuery({queryKey: ["admin", "stats"], queryFn: api.adminStats})
+
+  if (stats.isPending) {
+    return (
+      <Section title="Overview">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+      </Section>
+    )
+  }
+  if (stats.isError) {
+    return (
+      <Section title="Overview">
+        <p className="text-sm text-destructive">{stats.error.message}</p>
+      </Section>
+    )
+  }
+  const s = stats.data
+  const pct = Math.min(100, (s.storageBytes / FREE_TIER_BYTES) * 100)
+
+  return (
+    <Section
+      title="Overview"
+      action={
+        <a
+          href="https://dash.cloudflare.com/?to=/:account/web-analytics"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          Traffic in Cloudflare
+          <ExternalLink className="size-3.5" aria-hidden />
+        </a>
+      }
+    >
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Memes" value={formatCount(s.memes)} />
+        <Stat
+          label="Storage"
+          value={formatBytes(s.storageBytes)}
+          hint={`${pct < 1 ? "<1" : pct.toFixed(0)}% of 10 GB`}
+        />
+        <Stat
+          label="Copies"
+          value={formatCount(s.copiesTotal)}
+          hint={`${formatCount(s.viewsTotal)} fetches`}
+        />
+        <Stat label="This week" value={formatCount(s.uploadsLast7d)} hint="uploads" />
+      </dl>
+
+      <div className="grid gap-6 sm:grid-cols-[1fr_16rem]">
+        <div className="grid gap-2">
+          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Most copied
+          </h3>
+          {s.topMemes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing copied yet.</p>
+          ) : (
+            <ol className="grid grid-cols-5 gap-2">
+              {s.topMemes.map((m: Meme) => (
+                <li
+                  key={m.id}
+                  className="relative aspect-square overflow-hidden rounded-md bg-muted"
+                >
+                  <a href={m.url} target="_blank" rel="noreferrer" title={m.title || m.id}>
+                    <img
+                      src={m.thumbUrl}
+                      alt={m.title}
+                      className="size-full object-cover"
+                      loading="lazy"
+                    />
+                  </a>
+                  <span className="absolute right-1 bottom-1 rounded-sm bg-black/70 px-1 text-[10px] font-medium text-white">
+                    {formatCount(m.copies)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+        <div className="grid content-start gap-2">
+          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Top uploaders
+          </h3>
+          {s.topUploaders.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No uploads yet.</p>
+          ) : (
+            <ul className="grid gap-1.5">
+              {s.topUploaders.map(({user, count}) => (
+                <li key={user.id} className="flex items-center gap-2 text-sm">
+                  <UserAvatar user={user} size="sm" />
+                  <span className="min-w-0 flex-1 truncate">{user.name}</span>
+                  <span className="text-muted-foreground tabular-nums">{count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+function Stat({label, value, hint}: {label: string; value: string; hint?: string}) {
+  return (
+    <div className="rounded-lg bg-card px-4 py-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</dd>
+      {hint && <dd className="text-xs text-muted-foreground">{hint}</dd>}
+    </div>
+  )
+}
+
+function Invites() {
+  const queryClient = useQueryClient()
+  const invites = useQuery({queryKey: ["admin", "invites"], queryFn: api.invites})
+  const [created, setCreated] = useState<CreatedInvite | null>(null)
+
+  const create = useMutation({
+    mutationFn: api.createInvite,
+    onSuccess: (inv) => {
+      setCreated(inv)
+      void queryClient.invalidateQueries({queryKey: ["admin", "invites"]})
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const cancel = useMutation({
+    mutationFn: api.cancelInvite,
+    onSuccess: () => void queryClient.invalidateQueries({queryKey: ["admin", "invites"]}),
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <Section
+      title="Invites"
+      body="Each link works once and expires after 24 hours."
+      action={
+        <Button
+          size="sm"
+          onClick={() => create.mutate()}
+          disabled={create.isPending}
+          className="pressable"
+        >
+          New invite
+        </Button>
+      }
+    >
+      {invites.isPending ? (
+        <Skeleton className="h-10 rounded-md" />
+      ) : invites.isError ? (
+        <p className="text-sm text-destructive">{invites.error.message}</p>
+      ) : invites.data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No pending invites.</p>
+      ) : (
+        <ul className="divide-y rounded-lg border">
+          {invites.data.map((inv) => (
+            <li key={inv.tokenHash} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <span className="font-mono text-xs text-muted-foreground">
+                {inv.tokenHash.slice(0, 8)}
+              </span>
+              <span className="text-muted-foreground">
+                created {formatRelative(inv.createdAt)}, expires {formatRelative(inv.expiresAt)}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                disabled={cancel.isPending}
+                onClick={() => cancel.mutate(inv.tokenHash)}
+              >
+                Cancel
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Dialog open={created !== null} onOpenChange={(open) => !open && setCreated(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite link</DialogTitle>
+            <DialogDescription>
+              Send this to one friend. It works once and expires in 24 hours. You won't see it
+              again after closing this.
+            </DialogDescription>
+          </DialogHeader>
+          {created && <CopyField value={created.url} />}
+        </DialogContent>
+      </Dialog>
+    </Section>
+  )
+}
+
+function CopyField({value}: {value: string}) {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    if (await copyText(value)) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } else {
+      toast.error("Couldn't copy")
+    }
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        readOnly
+        value={value}
+        onFocus={(e) => e.currentTarget.select()}
+        className="h-9 min-w-0 flex-1 rounded-md border bg-transparent px-2.5 font-mono text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+      />
+      <Button size="sm" onClick={() => void copy()} className="w-24">
+        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+        {copied ? "Copied" : "Copy"}
+      </Button>
+    </div>
+  )
+}
+
+function Admins({ownerId}: {ownerId: string}) {
+  const queryClient = useQueryClient()
+  const users = useQuery({queryKey: ["admin", "users"], queryFn: api.adminUsers})
+  const [revoking, setRevoking] = useState<AdminUser | null>(null)
+
+  const revoke = useMutation({
+    mutationFn: api.revokeUser,
+    onSuccess: () => {
+      toast("Revoked")
+      setRevoking(null)
+      void queryClient.invalidateQueries({queryKey: ["admin"]})
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <Section title="Admins" body="Everyone here can upload, edit and delete any meme.">
+      {users.isPending ? (
+        <Skeleton className="h-24 rounded-md" />
+      ) : users.isError ? (
+        <p className="text-sm text-destructive">{users.error.message}</p>
+      ) : (
+        <ul className="divide-y rounded-lg border">
+          {users.data.map((u) => (
+            <li
+              key={u.id}
+              className={cn(
+                "grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm sm:grid-cols-[auto_1fr_5rem_7rem_7rem_auto]",
+                u.revokedAt && "opacity-50",
+              )}
+            >
+              <UserAvatar user={u} size="md" />
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-medium">{u.name}</span>
+                <Badge
+                  variant={u.role === "owner" ? "default" : "secondary"}
+                  className="capitalize"
+                >
+                  {u.role}
+                </Badge>
+                {u.revokedAt && <Badge variant="outline">revoked</Badge>}
+              </div>
+              <span className="hidden text-muted-foreground tabular-nums sm:block">
+                {u.uploadCount} {u.uploadCount === 1 ? "upload" : "uploads"}
+              </span>
+              <span className="hidden text-muted-foreground sm:block" title={u.createdAt}>
+                joined {formatDate(u.createdAt)}
+              </span>
+              <span className="hidden text-muted-foreground sm:block">
+                {u.lastSeenAt ? `seen ${formatRelative(u.lastSeenAt)}` : "never seen"}
+              </span>
+              <div className="justify-self-end">
+                {u.id !== ownerId && !u.revokedAt && (
+                  <Button variant="ghost" size="sm" onClick={() => setRevoking(u)}>
+                    Revoke
+                  </Button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <AlertDialog open={revoking !== null} onOpenChange={(open) => !open && setRevoking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke {revoking?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They are signed out everywhere right away and can't sign back in. Their memes
+              stay.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={revoke.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                if (revoking) revoke.mutate(revoking.id)
+              }}
+            >
+              Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Section>
+  )
+}

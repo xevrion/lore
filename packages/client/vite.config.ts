@@ -1,6 +1,7 @@
+import {fileURLToPath} from "node:url"
+
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import {fileURLToPath} from "node:url"
 import {defineConfig} from "vite"
 
 // In development the API and file routes are served by `wrangler dev` on 8787.
