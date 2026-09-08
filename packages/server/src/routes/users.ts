@@ -26,7 +26,7 @@ export default app().patch("/users/me", async (c) => {
   let avatarKey = user.avatarKey
   if (avatar instanceof File && avatar.size > 0) {
     avatarKey = await storeAvatar(c.env.BUCKET, user.id, avatar)
-    await caches.default.delete(`${origin(c)}/a/${user.id}.webp`)
+    if (user.avatarKey) await c.env.BUCKET.delete(user.avatarKey)
   }
   await sql(c.env.DB)`
     update user set name = ${name}, avatar_key = ${avatarKey} where id = ${user.id}

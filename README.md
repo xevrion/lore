@@ -1,49 +1,70 @@
-# lore
+<h1 align="center">lore</h1>
 
-A self-hosted meme host for you and your friends. Upload images and GIFs, click one
-to copy its link, paste it anywhere and it shows up as the real image, the way Tenor
-GIFs do in Discord. Runs free on Cloudflare. [**Install**](docs/install.md)
+<p align="center">The meme archive for your friend group. Click a meme, paste the link in Discord, it shows up as the actual image.</p>
 
-One person hosts it and signs in with an authenticator code. Friends get in through
-single-use invite links, no passwords anywhere. Everyone else can browse, search and
-copy links without an account.
+<p align="center"><a href="docs/install.md">Set up your own</a> in about ten minutes with nothing but a Cloudflare account and a domain.</p>
 
-Memes are served from `/i/<id>.<ext>` with the right `Content-Type`, a year-long
-immutable cache header and no `Content-Disposition`, so Discord, WhatsApp, Slack and
-friends unfurl them inline instead of showing a link card. Responses are cached at
-Cloudflare's edge; a link pasted into a busy server costs one Worker request.
+---
 
-The whole thing is one Cloudflare Worker with D1 for metadata, R2 for files, and the
-React client served as static assets from the same deploy. Nothing else to sign up
-for. Inspired by [aspizu/dcim](https://github.com/aspizu/dcim).
+Every friend group has a pile of images that get reposted for years. Screenshots of
+someone's typo, that one reaction GIF, the photo nobody is allowed to delete. They
+live scattered across chat history and camera rolls, and finding the right one at the
+right moment is half the joke.
 
-![gallery](docs/assets/gallery.webp)
+lore gives them a home. You host it, your friends upload, everyone can browse and
+copy. The link you copy is the file itself, so chat apps unfurl it inline the way they
+do for Tenor or Imgur. No login walls, no expiring links, no "click to view".
 
-## What you get
+## How it works
 
-- A masonry wall of memes, GIFs animating, infinite scroll, live search by title and tag.
-- Click to copy the direct link. New and Top (most copied) sorting.
-- Drag and drop, paste from clipboard, or pick files to upload up to 30 at a time. JPG
-  and PNG are re-encoded in the browser first so EXIF (including GPS) never leaves your
-  machine. GIFs are stored byte for byte.
-- Every meme shows who added it. Any admin can edit titles and tags or delete anything.
-- Owner dashboard with storage used, copy counts, top memes, top uploaders, invite
-  management and one-click revoke.
-- Magic-byte sniffing on every upload, rate limits, hashed sessions with sliding
-  expiry, security headers, forward-only migrations, tests on the tricky bits, CI that
-  deploys on push.
+**Links that render.** Each meme lives at `/i/<id>.<ext>` and is served with the
+real `Content-Type`, an immutable one year cache header and no download disposition.
+Discord, WhatsApp, Slack, Telegram and Twitter all treat that as an image. GIFs stay
+animated because they are never re-encoded.
 
-## Development
+**Zero cost, one vendor.** A single Cloudflare Worker serves the API, the files and
+the web app. Metadata is in D1, files are in R2, and hot memes are answered from
+Cloudflare's edge cache without touching either. A group of twenty people with a few
+thousand memes fits in the free tier with room to spare.
+
+**No passwords.** The owner signs in with a six digit authenticator code. Friends
+join through invite links that work exactly once and expire in a day. Visitors need
+nothing at all.
+
+**Uploads that are careful with your data.** JPGs and PNGs are re-encoded in the
+browser before upload, so EXIF (camera model, GPS position) never reaches the
+server. Every file is checked by its magic bytes, not its extension.
+
+## Features
+
+- Masonry wall with animated GIFs, infinite scroll and live search over titles and tags
+- Click to copy, `Enter` to copy, `o` to open, middle click for a new tab
+- Sort by newest or most copied
+- Drag and drop, paste from the clipboard, or pick up to 30 files at once, three uploading in parallel with progress
+- Every meme shows who added it
+- Any admin can edit titles and tags or delete anything
+- Owner dashboard: storage used, copy counts, top memes, top uploaders, pending invites, revoke with one click
+- Dark theme by default, light theme a toggle away
+- Rate limits, hashed sessions with sliding expiry, security headers, forward only migrations, tests on the parts that matter, CI that deploys on push
+
+## Run it locally
 
 ```sh
 pnpm install
-pnpm migrate
-pnpm seed
-pnpm dev
+pnpm migrate     # local D1
+pnpm seed        # sample memes
+pnpm dev         # http://localhost:5173
 ```
 
-See [docs/install.md](docs/install.md) for the full setup, including local development
-details and how to run the checks CI runs.
+You will want a `TOTP_SECRET` in `.dev.vars` to sign in; `node scripts/setup.ts
+--local-only` generates one and prints the QR code. The full setup guide, including
+production deployment and GitHub Actions, is in [docs/install.md](docs/install.md).
+
+## Stack
+
+Cloudflare Workers, D1, R2 and the Rate Limiting binding. Hono and zod on the
+server. React 19, Vite, Tailwind v4, shadcn/ui and TanStack Query on the client.
+Vitest with the Workers pool for tests. pnpm workspace, oxfmt, oxlint.
 
 ## License
 

@@ -1,5 +1,5 @@
 import {app, origin, type Context} from "../lib/app"
-import {avatarKey} from "../lib/avatar"
+import {AVATAR_VERSION, avatarKey} from "../lib/avatar"
 import {GONE_PNG} from "../lib/gone"
 import {sql} from "../lib/sql"
 
@@ -150,9 +150,11 @@ export default app()
     const match = WEBP_FILE.exec(c.req.param("file"))
     if (!match) return plainNotFound()
     const userId = match[1] ?? ""
+    const version = c.req.query("v") ?? ""
+    if (!AVATAR_VERSION.test(version)) return plainNotFound()
     return serve(c, {
       cacheControl: DAILY,
       notFound: plainNotFound,
-      resolve: async () => ({key: avatarKey(userId), contentType: null}),
+      resolve: async () => ({key: avatarKey(userId, version), contentType: null}),
     })
   })

@@ -27,8 +27,11 @@ export const MEME_SELECT = `
     u.avatar_key as uploader_avatar_key
   from meme m join user u on u.id = m.uploader_id`
 
-export const avatarUrl = (origin: string, userId: string, avatarKey: string | null) =>
-  avatarKey ? `${origin}/a/${userId}.webp` : null
+export function avatarUrl(origin: string, userId: string, avatarKey: string | null) {
+  if (!avatarKey) return null
+  const version = /-([0-9a-zA-Z]+)\.webp$/.exec(avatarKey)?.[1]
+  return `${origin}/a/${userId}.webp${version ? `?v=${version}` : ""}`
+}
 
 export function toUser(
   origin: string,
