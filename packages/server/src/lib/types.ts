@@ -68,6 +68,7 @@ export interface CreatedInvite {
 export interface AdminStats {
   memes: number
   storageBytes: number
+  storageCap: number
   copiesTotal: number
   viewsTotal: number
   uploadsLast7d: number

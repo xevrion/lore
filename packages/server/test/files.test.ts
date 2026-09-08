@@ -1,6 +1,7 @@
-import {SELF} from "cloudflare:test"
+import {createExecutionContext, env, SELF} from "cloudflare:test"
 import {beforeAll, describe, expect, it} from "vitest"
 
+import app from "../src/index"
 import type {Meme, MemeList} from "../src/lib/types"
 import {loginAsOwner, ORIGIN, TINY_GIF, TINY_PNG, upload} from "./helpers"
 
@@ -170,5 +171,20 @@ describe("listing", () => {
     const none = (await (await SELF.fetch(`${ORIGIN}/api/memes?q=zzzz`)).json()) as MemeList
     expect(none).toEqual({items: [], nextCursor: null})
     expect((await SELF.fetch(`${ORIGIN}/api/memes?cursor=garbage`)).status).toBe(400)
+  })
+})
+
+describe("storage cap", () => {
+  it("refuses uploads that would pass the cap", async () => {
+    const cookie = await loginAsOwner()
+    const form = new FormData()
+    form.set("file", new File([TINY_GIF], "a.gif", {type: "image/gif"}))
+    const res = await app.request(
+      `${ORIGIN}/api/memes`,
+      {method: "POST", body: form, headers: {cookie}},
+      {...env, STORAGE_CAP_BYTES: "1"},
+      createExecutionContext(),
+    )
+    expect(res.status).toBe(507)
   })
 })

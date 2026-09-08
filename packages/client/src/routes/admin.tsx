@@ -33,8 +33,6 @@ import {copyText} from "@/lib/clipboard"
 import {formatBytes, formatCount, formatDate, formatRelative} from "@/lib/format"
 import {cn} from "@/lib/utils"
 
-const FREE_TIER_BYTES = 10 * 1024 * 1024 * 1024
-
 export default function Admin() {
   const {data: me, isPending} = useMe()
   const navigate = useNavigate()
@@ -105,7 +103,7 @@ function Overview() {
     )
   }
   const s = stats.data
-  const pct = Math.min(100, (s.storageBytes / FREE_TIER_BYTES) * 100)
+  const pct = Math.min(100, (s.storageBytes / s.storageCap) * 100)
 
   return (
     <Section
@@ -127,7 +125,7 @@ function Overview() {
         <Stat
           label="Storage"
           value={formatBytes(s.storageBytes)}
-          hint={`${pct < 1 ? "<1" : pct.toFixed(0)}% of 10 GB`}
+          hint={`${pct < 1 ? "<1" : pct.toFixed(0)}% of the ${formatBytes(s.storageCap)} cap`}
         />
         <Stat
           label="Copies"

@@ -1,7 +1,7 @@
 import {HTTPException} from "hono/http-exception"
 
 import {deleteUserSessions, hashToken, newToken, requireOwner} from "../auth"
-import {app, now, origin} from "../lib/app"
+import {app, now, origin, storageCap} from "../lib/app"
 import {MEME_SELECT, toMeme, toUser, type MemeRow} from "../lib/meme"
 import {sql} from "../lib/sql"
 import type {AdminStats, AdminUser, CreatedInvite, PendingInvite} from "../lib/types"
@@ -48,6 +48,7 @@ export default app()
     const stats: AdminStats = {
       memes: t.memes ?? 0,
       storageBytes: t.storage_bytes ?? 0,
+      storageCap: storageCap(c.env),
       copiesTotal: t.copies_total ?? 0,
       viewsTotal: t.views_total ?? 0,
       uploadsLast7d: (recent?.results[0] as {n: number} | undefined)?.n ?? 0,

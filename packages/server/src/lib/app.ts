@@ -34,4 +34,8 @@ export function origin(c: Context) {
 export const discordEnabled = (env: Bindings) =>
   Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET)
 
+// R2 bills past 10 GB, so uploads stop well before that. Overridable per instance.
+export const storageCap = (env: Bindings) =>
+  Number(env.STORAGE_CAP_BYTES) || 9 * 1024 * 1024 * 1024
+
 export const now = () => new Date().toISOString()

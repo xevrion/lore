@@ -18,6 +18,8 @@
   "vars": {
     // Display name for the owner account, created on first login.
     "OWNER_NAME": "owner",
+    // Uploads are refused past this many bytes so R2 never leaves its free tier.
+    "STORAGE_CAP_BYTES": "9663676416",
     // Cloudflare Web Analytics beacon token. Leave empty to disable.
     "WEB_ANALYTICS_TOKEN": "",
     // Optional Discord sign-in: add "DISCORD_CLIENT_ID": "..." here and set the

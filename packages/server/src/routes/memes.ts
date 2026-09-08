@@ -2,7 +2,7 @@ import {HTTPException} from "hono/http-exception"
 import {z} from "zod"
 
 import {requireAdmin} from "../auth"
-import {app, now, origin, type Context} from "../lib/app"
+import {app, now, origin, storageCap, type Context} from "../lib/app"
 import {decodeCursor, encodeCursor} from "../lib/cursor"
 import {uniqueMemeId} from "../lib/id"
 import {dimensions, sniff} from "../lib/image"
@@ -110,6 +110,13 @@ export default app()
       throw new HTTPException(415, {message: "Only png, jpg, gif and webp are accepted"})
     const size = dimensions(bytes, type.ext)
     if (!size) throw new HTTPException(400, {message: "Could not read the image dimensions"})
+
+    const used = await sql(c.env.DB)`select coalesce(sum(size), 0) as total from meme`.first<{
+      total: number
+    }>()
+    if ((used?.total ?? 0) + bytes.length > storageCap(c.env)) {
+      throw new HTTPException(507, {message: "The archive is full. Delete something first."})
+    }
 
     const title = patchSchema.shape.title.parse(form.get("title") ?? "") ?? ""
     const tags = normalizeTags(String(form.get("tags") ?? ""))
