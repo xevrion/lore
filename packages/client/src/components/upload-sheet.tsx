@@ -50,7 +50,7 @@ export default function UploadSheet() {
         <SheetHeader className="border-b">
           <SheetTitle>Upload</SheetTitle>
           <SheetDescription>
-            PNG, JPG, GIF or WebP up to 25 MB. GIFs under 8 MB preview reliably in Discord.
+            PNG, JPG, GIF or WebP up to 10 MB. GIFs under 8 MB preview reliably in Discord.
           </SheetDescription>
         </SheetHeader>
 

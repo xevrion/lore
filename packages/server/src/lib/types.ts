@@ -81,7 +81,7 @@ export interface ApiError {
 }
 
 export const LIMITS = {
-  fileBytes: 25 * 1024 * 1024,
+  fileBytes: 10 * 1024 * 1024,
   gifInlineHintBytes: 8 * 1024 * 1024,
   avatarBytes: 200 * 1024,
   batchFiles: 30,

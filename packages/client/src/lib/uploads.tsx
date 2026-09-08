@@ -95,7 +95,7 @@ class UploadStore {
     fresh.forEach((item, i) => {
       const file = files[i]!
       if (file.size > LIMITS.fileBytes) {
-        this.patch(item.id, {status: "rejected", error: "Over 25 MB"})
+        this.patch(item.id, {status: "rejected", error: "Over 10 MB"})
         return
       }
       prepareImage(file)

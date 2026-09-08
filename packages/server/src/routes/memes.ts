@@ -102,7 +102,7 @@ export default app()
       throw new HTTPException(400, {message: "No file"})
     }
     if (file.size > LIMITS.fileBytes) {
-      throw new HTTPException(413, {message: "Files must be under 25 MB"})
+      throw new HTTPException(413, {message: "Files must be under 10 MB"})
     }
     const bytes = new Uint8Array(await file.arrayBuffer())
     const type = sniff(bytes)

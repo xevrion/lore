@@ -61,7 +61,7 @@ export function DropOverlay({
       <div className="flex animate-in flex-col items-center gap-3 rounded-xl border-2 border-dashed border-primary/60 px-16 py-14 text-center duration-150 ease-(--ease-out-strong) zoom-in-95">
         <ImagePlus className="size-8 text-primary" aria-hidden />
         <p className="text-lg font-medium">Drop to upload</p>
-        <p className="text-sm text-muted-foreground">PNG, JPG, GIF or WebP, up to 25 MB each</p>
+        <p className="text-sm text-muted-foreground">PNG, JPG, GIF or WebP, up to 10 MB each</p>
       </div>
     </div>
   )

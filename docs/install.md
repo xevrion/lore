@@ -175,4 +175,4 @@ a popular GIF pasted into a busy Discord server costs one Worker request, not on
 per viewer.
 
 Discord renders GIFs inline reliably up to about 8 MB. The uploader warns you
-above that, and refuses anything over 25 MB.
+above that, and refuses anything over 10 MB.
