@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "pnpm run --parallel --stream \"/^dev:/\"",
     "dev:client": "pnpm --filter @lore/client dev",
-    "dev:server": "wrangler dev",
+    "dev:server": "wrangler dev --host localhost:8787 --local-protocol http",
     "build": "pnpm --filter @lore/client build",
     "check": "pnpm -r run check && tsc -p scripts/tsconfig.json",
     "lint": "oxlint",

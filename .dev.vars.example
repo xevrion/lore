@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local development. `node scripts/setup.ts` fills this in.
+TOTP_SECRET=

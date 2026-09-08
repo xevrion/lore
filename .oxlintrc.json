@@ -8,7 +8,14 @@
   "rules": {
     "no-unused-vars": "error",
     "typescript/no-explicit-any": "error",
-    "unicorn/prefer-node-protocol": "error"
+    "unicorn/prefer-node-protocol": "error",
+    "react/react-in-jsx-scope": "off",
+    "oxc/no-async-endpoint-handlers": "off"
   },
-  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "worker-configuration.d.ts", "packages/client/src/components/ui/**"]
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "worker-configuration.d.ts",
+    "packages/client/src/components/ui/**"
+  ]
 }
