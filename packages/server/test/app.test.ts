@@ -18,6 +18,16 @@ describe("app shell", () => {
     )
     expect(res.headers.get("x-frame-options")).toBe("DENY")
     expect(res.headers.get("x-content-type-options")).toBe("nosniff")
+  })
+
+  it("leaves the beacon out when no token is configured", async () => {
+    const ctx = createExecutionContext()
+    const res = await worker.fetch(
+      new Request(`${ORIGIN}/`),
+      {...env, WEB_ANALYTICS_TOKEN: ""},
+      ctx,
+    )
+    await waitOnExecutionContext(ctx)
     expect(await res.text()).not.toContain("cloudflareinsights")
   })
 
