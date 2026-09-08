@@ -1,6 +1,6 @@
 # Set up your own lore
 
-You need a Cloudflare account, a domain whose DNS is on Cloudflare, Node.js 22 or
+You need a Cloudflare account, a domain whose DNS is on Cloudflare, Node.js 22.12 or
 newer, and pnpm. Nothing else. Everything runs on Cloudflare's free tier and there
 is no credit card step.
 
