@@ -22,8 +22,9 @@
     "STORAGE_CAP_BYTES": "9663676416",
     // Cloudflare Web Analytics beacon token. Leave empty to disable.
     "WEB_ANALYTICS_TOKEN": "0eefd4b38854466e9fc5ef41533dc64c",
-    // Optional Discord sign-in: add "DISCORD_CLIENT_ID": "..." here and set the
-    // DISCORD_CLIENT_SECRET secret. See docs/install.md.
+    // Optional Discord sign-in. Pair it with the DISCORD_CLIENT_SECRET secret,
+    // see docs/install.md. Remove the line to turn Discord login off.
+    "DISCORD_CLIENT_ID": "1546925854268067980",
   },
 
   "d1_databases": [
