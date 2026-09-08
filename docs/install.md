@@ -116,7 +116,8 @@ pnpm dev         # Vite on 5173, wrangler dev on 8787
 
 Open `http://localhost:5173`. The Vite dev server proxies `/api`, `/i`, `/t`, `/a`
 and `/m` to the Worker, which uses local D1 and R2 emulation stored under
-`.wrangler/`. Your authenticator code from setup works locally too because the
+`.wrangler/`. The Worker is told its public host is `localhost:5173`, so every URL it
+hands out stays on the Vite origin and the browser never talks to port 8787 directly. Your authenticator code from setup works locally too because the
 same secret is in `.dev.vars`.
 
 Run the whole CI suite locally with:
