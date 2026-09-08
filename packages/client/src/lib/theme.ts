@@ -13,8 +13,14 @@ function read(): Theme {
   }
 }
 
+let transitionTimer: ReturnType<typeof setTimeout> | undefined
+
 function apply(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark")
+  const html = document.documentElement
+  html.classList.add("theme-transition")
+  clearTimeout(transitionTimer)
+  transitionTimer = setTimeout(() => html.classList.remove("theme-transition"), 250)
+  html.classList.toggle("dark", theme === "dark")
   try {
     localStorage.setItem(KEY, theme)
   } catch {

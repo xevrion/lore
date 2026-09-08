@@ -9,14 +9,15 @@
     "dev:client": "pnpm --filter @lore/client dev",
     "dev:server": "wrangler dev --host localhost:8787 --local-protocol http",
     "build": "pnpm --filter @lore/client build",
-    "check": "pnpm -r run check && tsc -p scripts/tsconfig.json",
+    "check": "wrangler types && pnpm -r run check && tsc -p scripts/tsconfig.json",
     "lint": "oxlint",
     "fmt": "oxfmt",
     "test": "pnpm --filter @lore/server test",
     "seed": "node scripts/seed.ts",
     "setup": "node scripts/setup.ts",
     "migrate": "wrangler d1 migrations apply lore --local",
-    "deploy": "pnpm build && wrangler deploy"
+    "deploy": "pnpm build && wrangler deploy",
+    "postinstall": "wrangler types"
   },
   "devDependencies": {
     "@types/node": "^26.5.0",

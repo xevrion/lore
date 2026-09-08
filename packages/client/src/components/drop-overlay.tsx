@@ -57,8 +57,8 @@ export function DropOverlay({
 
   if (!active) return null
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/85 p-6">
-      <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-primary/60 px-16 py-14 text-center">
+    <div className="fixed inset-0 z-40 flex animate-in items-center justify-center bg-background/85 p-6 duration-150 fade-in-0">
+      <div className="flex animate-in flex-col items-center gap-3 rounded-xl border-2 border-dashed border-primary/60 px-16 py-14 text-center duration-150 ease-(--ease-out-strong) zoom-in-95">
         <ImagePlus className="size-8 text-primary" aria-hidden />
         <p className="text-lg font-medium">Drop to upload</p>
         <p className="text-sm text-muted-foreground">PNG, JPG, GIF or WebP, up to 25 MB each</p>

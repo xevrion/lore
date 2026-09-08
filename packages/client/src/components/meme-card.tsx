@@ -1,6 +1,6 @@
 import type {Meme} from "@lore/server/types"
-import {Copy, ExternalLink, MoreHorizontal, Pencil, Trash2} from "lucide-react"
-import {useCallback, useState} from "react"
+import {Check, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2} from "lucide-react"
+import {useCallback, useEffect, useState} from "react"
 import type {ComponentProps, KeyboardEvent, MouseEvent, ReactNode} from "react"
 import {toast} from "sonner"
 
@@ -19,6 +19,9 @@ import {cn} from "@/lib/utils"
 interface MemeCardProps {
   meme: Meme
   eager: boolean
+  // Position within its page, used to stagger the entrance. Capped so a long
+  // page does not keep cards invisible for seconds.
+  stagger: number
   canEdit: boolean
   onCopied: (meme: Meme) => void
   onEdit: (meme: Meme) => void
@@ -36,10 +39,26 @@ export async function copyMemeLink(meme: Meme, onCopied: (meme: Meme) => void) {
   toast.success("Link copied. Paste it in Discord.", {id: "copied"})
 }
 
-export function MemeCard({meme, eager, canEdit, onCopied, onEdit, onDelete}: MemeCardProps) {
+export function MemeCard({
+  meme,
+  eager,
+  stagger,
+  canEdit,
+  onCopied,
+  onEdit,
+  onDelete,
+}: MemeCardProps) {
   const [loaded, setLoaded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [copiedAt, setCopiedAt] = useState(0)
   const isGif = meme.ext === "gif"
+
+  // A timer rather than animationend, which browsers hold back in hidden tabs.
+  useEffect(() => {
+    if (!copiedAt) return
+    const t = setTimeout(() => setCopiedAt(0), 800)
+    return () => clearTimeout(t)
+  }, [copiedAt])
 
   // A cached image can finish before React attaches onLoad, which would leave
   // it faded out forever.
@@ -51,18 +70,25 @@ export function MemeCard({meme, eager, canEdit, onCopied, onEdit, onDelete}: Mem
     window.open(meme.url, "_blank", "noopener")
   }
 
+  function copy() {
+    void copyMemeLink(meme, (m) => {
+      setCopiedAt(Date.now())
+      onCopied(m)
+    })
+  }
+
   function onClick(e: MouseEvent) {
     if (e.metaKey || e.ctrlKey || e.button === 1) {
       open()
       return
     }
-    void copyMemeLink(meme, onCopied)
+    copy()
   }
 
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault()
-      void copyMemeLink(meme, onCopied)
+      copy()
     } else if (e.key === "o" || e.key === "O") {
       e.preventDefault()
       open()
@@ -72,10 +98,12 @@ export function MemeCard({meme, eager, canEdit, onCopied, onEdit, onDelete}: Mem
   return (
     <article
       className={cn(
-        "group relative mb-3 break-inside-avoid overflow-hidden rounded-lg bg-card",
-        "outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-        menuOpen && "is-open",
+        "group relative mb-3 animate-rise break-inside-avoid overflow-hidden rounded-lg bg-card",
+        "ring-1 ring-transparent transition-[box-shadow] duration-200 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
+        "[@media(hover:hover)]:hover:ring-foreground/15",
+        menuOpen && "is-open ring-foreground/15",
       )}
+      style={{animationDelay: `${Math.min(stagger, 20) * 30}ms`}}
     >
       <button
         type="button"
@@ -110,10 +138,25 @@ export function MemeCard({meme, eager, canEdit, onCopied, onEdit, onDelete}: Mem
         </span>
       )}
 
+      {copiedAt > 0 && (
+        <span
+          key={copiedAt}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+        >
+          <span className="flex animate-copied items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-lg ring-1 ring-foreground/10">
+            <Check className="size-3.5 text-primary" aria-hidden />
+            Copied
+          </span>
+        </span>
+      )}
+
       <div
         className={cn(
           "pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1.5 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-2.5 pt-8 pb-2 text-white",
-          "opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-[.is-open]:opacity-100 [@media(hover:none)]:opacity-100",
+          "translate-y-1 opacity-0 transition-[opacity,transform] duration-200 ease-(--ease-out-strong)",
+          "group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:translate-y-0 group-hover:opacity-100 group-[.is-open]:translate-y-0 group-[.is-open]:opacity-100",
+          "[@media(hover:none)]:translate-y-0 [@media(hover:none)]:opacity-100",
         )}
       >
         {meme.title && <p className="truncate text-sm font-medium">{meme.title}</p>}

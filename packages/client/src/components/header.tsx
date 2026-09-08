@@ -54,7 +54,7 @@ export function Header({query, onQuery, sort, onSort, onUpload}: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/95">
       <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:flex-nowrap sm:px-6">
-        <Wordmark />
+        <Wordmark className="h-8" />
         {searchable && (
           <div className="order-last flex w-full items-center gap-2 sm:order-none sm:mx-auto sm:w-auto sm:max-w-md sm:flex-1">
             <label className="relative flex-1">
@@ -75,7 +75,7 @@ export function Header({query, onQuery, sort, onSort, onUpload}: HeaderProps) {
                 }}
                 placeholder="Search titles and tags"
                 aria-label="Search memes"
-                className="h-9 w-full rounded-md border border-input bg-transparent pr-8 pl-8 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 [&::-webkit-search-cancel-button]:hidden"
+                className="h-8 w-full rounded-md border border-input bg-transparent pr-8 pl-8 text-sm transition-[border-color,box-shadow] duration-150 outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 [&::-webkit-search-cancel-button]:hidden"
               />
               {query ? (
                 <button
@@ -95,7 +95,7 @@ export function Header({query, onQuery, sort, onSort, onUpload}: HeaderProps) {
             {sort && onSort && <SortToggle sort={sort} onSort={onSort} />}
           </div>
         )}
-        <div className="ml-auto flex items-center gap-2 sm:ml-0">
+        <div className="ml-auto flex h-8 items-center gap-2 sm:ml-0">
           {me && onUpload && (
             <Button size="sm" onClick={onUpload} className="pressable">
               <Upload aria-hidden />
@@ -123,8 +123,15 @@ function SortToggle({sort, onSort}: {sort: Sort; onSort: (s: Sort) => void}) {
     <div
       role="radiogroup"
       aria-label="Sort"
-      className="flex h-9 shrink-0 items-center rounded-md border border-input p-0.5 text-xs dark:bg-input/30"
+      className="relative grid h-8 shrink-0 grid-cols-2 rounded-md border border-input p-0.5 text-xs dark:bg-input/30"
     >
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded-[5px] bg-secondary transition-transform duration-200 ease-(--ease-out-strong)",
+          sort === "top" && "translate-x-full",
+        )}
+      />
       {(["new", "top"] as Sort[]).map((s) => (
         <button
           key={s}
@@ -133,10 +140,8 @@ function SortToggle({sort, onSort}: {sort: Sort; onSort: (s: Sort) => void}) {
           aria-checked={sort === s}
           onClick={() => onSort(s)}
           className={cn(
-            "h-full rounded-[5px] px-2.5 font-medium capitalize transition-colors",
-            sort === s
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:text-foreground",
+            "relative z-10 h-full rounded-[5px] px-2.5 font-medium capitalize transition-colors duration-150",
+            sort === s ? "text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {s}
@@ -168,7 +173,7 @@ function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Account menu"
-        className="rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="pressable inline-flex size-8 items-center justify-center rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <UserAvatar user={me} size="md" />
       </DropdownMenuTrigger>

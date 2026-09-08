@@ -36,9 +36,6 @@ jobs:
       - name: Lint
         run: pnpm exec oxlint
 
-      - name: Wrangler types are current
-        run: pnpm exec wrangler types --check
-
       - name: Typecheck
         run: pnpm run check
 

@@ -8,7 +8,7 @@ export function Wordmark({className, big = false}: {className?: string; big?: bo
       to="/"
       aria-label="lore, home"
       className={cn(
-        "inline-flex items-baseline font-semibold tracking-tight text-foreground",
+        "inline-flex items-center font-semibold tracking-tight text-foreground",
         big ? "text-3xl" : "text-lg",
         className,
       )}
@@ -17,8 +17,8 @@ export function Wordmark({className, big = false}: {className?: string; big?: bo
       <span
         aria-hidden
         className={cn(
-          "ml-0.5 inline-block rounded-full bg-primary",
-          big ? "size-2" : "size-1.5",
+          "ml-0.5 inline-block self-end rounded-full bg-primary",
+          big ? "mb-1.5 size-2" : "mb-[7px] size-1.5",
         )}
       />
     </Link>

@@ -96,6 +96,7 @@ export function MemeGrid({
   )
 
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
+  const staggers = list.data?.pages.flatMap((p) => p.items.map((_, i) => i)) ?? []
 
   if (list.isPending) return <GridSkeleton />
 
@@ -135,6 +136,7 @@ export function MemeGrid({
             key={meme.id}
             meme={meme}
             eager={i < EAGER}
+            stagger={staggers[i] ?? 0}
             canEdit={Boolean(me)}
             onCopied={onCopied}
             onEdit={setEditing}

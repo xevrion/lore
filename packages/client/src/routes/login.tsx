@@ -12,7 +12,7 @@ export default function Login() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [code, setCode] = useState("")
-  const [state, setState] = useState<"idle" | "busy" | "wrong">("idle")
+  const [state, setState] = useState<"idle" | "busy" | "wrong" | "ok">("idle")
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -28,6 +28,9 @@ export default function Login() {
     setState("busy")
     try {
       const user = await api.login(value)
+      setState("ok")
+      // A beat of green-lit boxes so the success registers before the wall appears.
+      await new Promise((r) => setTimeout(r, 220))
       queryClient.setQueryData(meQueryKey, user)
       void navigate("/", {replace: true})
     } catch (e) {
@@ -41,7 +44,7 @@ export default function Login() {
 
   return (
     <main className="grid min-h-dvh place-items-center px-4">
-      <div className="flex w-full max-w-xs flex-col items-center gap-8">
+      <div className="flex w-full max-w-xs animate-in flex-col items-center gap-8 duration-300 ease-(--ease-out-strong) fade-in-0 slide-in-from-bottom-2">
         <Wordmark big />
         <div
           className={cn(
@@ -56,7 +59,7 @@ export default function Login() {
             autoFocus
             inputMode="numeric"
             pattern="[0-9]*"
-            disabled={state === "busy"}
+            disabled={state === "busy" || state === "ok"}
             aria-label="Six digit code"
             onChange={(v) => {
               setCode(v)
@@ -64,7 +67,12 @@ export default function Login() {
               if (v.length === 6) void submit(v)
             }}
           >
-            <InputOTPGroup className="gap-1.5 *:size-11 *:rounded-md *:border *:text-lg">
+            <InputOTPGroup
+              className={cn(
+                "gap-1.5 *:size-11 *:rounded-md *:border *:text-lg *:transition-[border-color,background-color,color] *:duration-200",
+                state === "ok" && "*:border-primary *:bg-primary/10 *:text-primary",
+              )}
+            >
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <InputOTPSlot key={i} index={i} aria-invalid={state === "wrong"} />
               ))}
