@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "lore",
+  "main": "packages/server/src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "upload_source_maps": true,
+
+  // Change these to your own domain. The zone must be on Cloudflare DNS.
+  "routes": [
+    {
+      "pattern": "lore.xevrion.dev",
+      "zone_name": "xevrion.dev",
+      "custom_domain": true,
+    },
+  ],
+
+  "vars": {
+    // Display name for the owner account, created on first login.
+    "OWNER_NAME": "owner",
+    // Cloudflare Web Analytics beacon token. Leave empty to disable.
+    "WEB_ANALYTICS_TOKEN": "",
+  },
+
+  "secrets": {
+    "required": ["TOTP_SECRET"],
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lore",
+      "database_id": "REPLACE_WITH_YOUR_DATABASE_ID",
+      "migrations_dir": "migrations",
+    },
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "lore",
+    },
+  ],
+
+  // The Worker sees every request first so it can add security headers to the
+  // SPA and inject the analytics beacon. Unmatched paths fall through to assets.
+  "assets": {
+    "directory": "packages/client/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+  },
+
+  "ratelimits": [
+    {
+      "name": "RATELIMIT_API",
+      "namespace_id": "1001",
+      "simple": {"limit": 300, "period": 60},
+    },
+    {
+      "name": "RATELIMIT_AUTH",
+      "namespace_id": "1002",
+      "simple": {"limit": 10, "period": 60},
+    },
+    {
+      "name": "RATELIMIT_COPY",
+      "namespace_id": "1003",
+      "simple": {"limit": 10, "period": 60},
+    },
+  ],
+
+  "observability": {
+    "enabled": true,
+    "logs": {"enabled": true},
+    "traces": {"enabled": true},
+  },
+}

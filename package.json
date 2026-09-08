@@ -1,0 +1,44 @@
+{
+  "name": "lore",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm run --parallel --stream \"/^dev:/\"",
+    "dev:client": "pnpm --filter @lore/client dev",
+    "dev:server": "wrangler dev",
+    "build": "pnpm --filter @lore/client build",
+    "check": "pnpm -r run check && tsc -p scripts/tsconfig.json",
+    "lint": "oxlint",
+    "fmt": "oxfmt",
+    "test": "pnpm --filter @lore/server test",
+    "seed": "node scripts/seed.ts",
+    "setup": "node scripts/setup.ts",
+    "migrate": "wrangler d1 migrations apply lore --local",
+    "deploy": "pnpm build && wrangler deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.0",
+    "@types/qrcode": "^1.5.6",
+    "jsonc-parser": "^3.3.1",
+    "otplib": "^13.5.0",
+    "oxfmt": "^0.67.0",
+    "oxlint": "^1.82.0",
+    "qrcode": "^1.5.4",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.129.1"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.17.0",
+      "onFail": "warn"
+    },
+    "runtime": {
+      "name": "node",
+      "version": ">=22.0.0",
+      "onFail": "error"
+    }
+  }
+}
