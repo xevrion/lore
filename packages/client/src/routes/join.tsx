@@ -83,45 +83,41 @@ export default function Join() {
                   : "Pick a name your friends will recognise. No password, the link is the key."}
               </p>
             </div>
-            {discord && (
+            {discord ? (
+              <a
+                href={`/api/auth/discord/start?invite=${encodeURIComponent(token)}`}
+                className={buttonVariants({className: "pressable w-full"})}
+              >
+                <DiscordMark className="size-4" />
+                Continue with Discord
+              </a>
+            ) : (
               <>
-                <a
-                  href={`/api/auth/discord/start?invite=${encodeURIComponent(token)}`}
-                  className={buttonVariants({className: "pressable w-full"})}
-                >
-                  <DiscordMark className="size-4" />
-                  Continue with Discord
-                </a>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="h-px flex-1 bg-border" />
-                  or just pick a name
-                  <span className="h-px flex-1 bg-border" />
+                <div className="grid gap-2">
+                  <label htmlFor="join-name" className="text-sm font-medium">
+                    Display name
+                  </label>
+                  <Input
+                    id="join-name"
+                    value={name}
+                    autoFocus
+                    required
+                    maxLength={LIMITS.nameChars}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Yash"
+                  />
                 </div>
+                <AvatarPicker
+                  name={name}
+                  color={color}
+                  currentUrl={null}
+                  onChange={setAvatar}
+                />
+                <Button type="submit" disabled={busy || !name.trim()} className="pressable">
+                  Join
+                </Button>
               </>
             )}
-            <div className="grid gap-2">
-              <label htmlFor="join-name" className="text-sm font-medium">
-                Display name
-              </label>
-              <Input
-                id="join-name"
-                value={name}
-                autoFocus
-                required
-                maxLength={LIMITS.nameChars}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Yash"
-              />
-            </div>
-            <AvatarPicker name={name} color={color} currentUrl={null} onChange={setAvatar} />
-            <Button
-              type="submit"
-              variant={discord ? "outline" : "default"}
-              disabled={busy || !name.trim()}
-              className="pressable"
-            >
-              Join
-            </Button>
           </form>
         )}
       </div>

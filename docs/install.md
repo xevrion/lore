@@ -92,7 +92,8 @@ Every later push to `main` does the same.
 ## Invite friends
 
 Sign in, open `/admin`, click **New invite**. You get a link that works once and
-expires in 24 hours. Send it to a friend over DM; they pick a name and an avatar
+expires in 24 hours. Send it to a friend over DM; they pick a name and an avatar (or,
+with Discord login set up, they sign in with Discord instead)
 and can upload straight away. The same page lists everyone and lets you revoke
 access, which logs them out of every device immediately.
 
@@ -133,9 +134,11 @@ login page, and you can see which Discord account each admin is in `/admin`.
 
 5. Deploy again.
 
-The login and join pages now show a "Continue with Discord" button. Existing admins
-can connect their Discord account from `/settings`. Invites still come from `/admin`
-as described above; Discord only changes how a friend proves it is them.
+The login and join pages now show a "Continue with Discord" button, and the name-only
+join form disappears: once Discord is configured, an invite link alone is not enough
+to get in, the friend has to sign in with Discord too. Existing admins can connect
+their Discord account from `/settings`. Invites still come from `/admin` as described
+above; Discord only changes how a friend proves it is them.
 
 For local development put both values in `.dev.vars` instead.
 

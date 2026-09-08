@@ -16,7 +16,7 @@ import {
   setSessionCookie,
   COOKIE,
 } from "../auth"
-import {app, now, origin, type Context, type SessionUser} from "../lib/app"
+import {app, discordEnabled, now, origin, type Context, type SessionUser} from "../lib/app"
 import {storeAvatar} from "../lib/avatar"
 import {pickColor} from "../lib/colors"
 import {newId} from "../lib/id"
@@ -86,6 +86,11 @@ export default app()
     const avatar = form.get("avatar")
     if (typeof token !== "string" || !token) {
       throw new HTTPException(400, {message: "Missing invite token"})
+    }
+    // With Discord configured, an invite can only be claimed through Discord,
+    // otherwise anyone holding the link could join under any name.
+    if (discordEnabled(c.env)) {
+      throw new HTTPException(403, {message: "This lore uses Discord sign-in"})
     }
     const name = nameSchema.safeParse(form.get("name"))
     if (!name.success)

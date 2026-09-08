@@ -1,7 +1,7 @@
 import {deleteCookie, getCookie, setCookie} from "hono/cookie"
 
 import {getSession, hashToken, newToken} from "../auth"
-import {app, now, origin, type Context, type SessionUser} from "../lib/app"
+import {app, discordEnabled, now, origin, type Context, type SessionUser} from "../lib/app"
 import {storeAvatar} from "../lib/avatar"
 import {pickColor} from "../lib/colors"
 import {newId} from "../lib/id"
@@ -18,7 +18,7 @@ export const discordHttp = {
   fetch: (input: string, init?: RequestInit) => fetch(input, init),
 }
 
-const enabled = (c: Context) => Boolean(c.env.DISCORD_CLIENT_ID && c.env.DISCORD_CLIENT_SECRET)
+const enabled = (c: Context) => discordEnabled(c.env)
 
 const redirectUri = (c: Context) => `${origin(c)}/api/auth/discord/callback`
 

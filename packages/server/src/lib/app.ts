@@ -30,4 +30,8 @@ export function origin(c: Context) {
   return `${proto}://${host}`
 }
 
+// Discord sign-in is on only when both halves of the OAuth app are configured.
+export const discordEnabled = (env: Bindings) =>
+  Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET)
+
 export const now = () => new Date().toISOString()

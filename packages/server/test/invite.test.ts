@@ -1,7 +1,8 @@
-import {env, SELF} from "cloudflare:test"
+import {createExecutionContext, env, SELF} from "cloudflare:test"
 import {beforeAll, describe, expect, it} from "vitest"
 
 import {hashToken} from "../src/auth"
+import app from "../src/index"
 import {sql} from "../src/lib/sql"
 import type {CreatedInvite, Me} from "../src/lib/types"
 import {cookieOf, loginAsOwner, ORIGIN} from "./helpers"
@@ -18,16 +19,36 @@ const createInvite = async () => {
   return invite.url.split("/join/")[1] ?? ""
 }
 
-const join = (token: string, name = "friend") => {
+const joinForm = (token: string, name: string) => {
   const form = new FormData()
   form.set("token", token)
   form.set("name", name)
-  return SELF.fetch(`${ORIGIN}/api/auth/join`, {method: "POST", body: form})
+  return form
 }
+
+// The test env has Discord configured, so name-only joins go through an env
+// copy with it switched off, the way an instance without Discord runs.
+const join = (token: string, name = "friend") =>
+  app.request(
+    `${ORIGIN}/api/auth/join`,
+    {method: "POST", body: joinForm(token, name)},
+    {...env, DISCORD_CLIENT_ID: ""},
+    createExecutionContext(),
+  )
 
 describe("invites", () => {
   beforeAll(async () => {
     owner = await loginAsOwner()
+  })
+
+  it("refuses a name-only join when Discord sign-in is configured", async () => {
+    const token = await createInvite()
+    const res = await SELF.fetch(`${ORIGIN}/api/auth/join`, {
+      method: "POST",
+      body: joinForm(token, "impostor"),
+    })
+    expect(res.status).toBe(403)
+    expect((await SELF.fetch(`${ORIGIN}/api/auth/invite/${token}`)).status).toBe(200)
   })
 
   it("requires the owner", async () => {

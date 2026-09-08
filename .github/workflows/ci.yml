@@ -39,11 +39,11 @@ jobs:
       - name: Typecheck
         run: pnpm run check
 
-      - name: Test
-        run: pnpm run test
-
       - name: Build client
         run: pnpm run build
+
+      - name: Test
+        run: pnpm run test
 
       - name: Migrations are listed
         run: |
