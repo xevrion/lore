@@ -12,7 +12,7 @@ describe("id", () => {
       expect(id).toHaveLength(MEME_ID_LENGTH)
       expect([...id].every((ch) => ALPHABET.includes(ch))).toBe(true)
     }
-    expect(ALPHABET).not.toMatch(/[-_]/)
+    expect(ALPHABET).not.toMatch(/[-_0Oo1lI]/)
   })
 
   it("does not hand out an id that is already taken", async () => {

@@ -1,8 +1,8 @@
 import {customAlphabet} from "nanoid"
 
-// No `-` or `_`: they look ambiguous in chat apps and some unfurlers stop the
-// link at them.
-export const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+// No `-` or `_` (some unfurlers stop the link at them) and none of 0/O/o or
+// 1/l/I, which are identical in most fonts once someone retypes a link.
+export const ALPHABET = "23456789abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
 
 export const MEME_ID_LENGTH = 7
 

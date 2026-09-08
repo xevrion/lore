@@ -1,3 +1,4 @@
+import {stripMetadata} from "@lore/server/strip"
 import type {Ext} from "@lore/server/types"
 
 import {sniffFile} from "./sniff"
@@ -27,8 +28,9 @@ function draw(bitmap: ImageBitmap, maxEdge: number) {
   return canvas
 }
 
-// GIF and WebP go through untouched: the canvas would flatten animation. PNG
-// and JPG are re-encoded so EXIF (including GPS) never leaves the browser.
+// PNG and JPG have their metadata chunks removed before upload so EXIF
+// (including GPS) never leaves the browser. The pixels are not re-encoded,
+// which keeps the file the size the uploader chose.
 export async function prepareImage(input: File): Promise<Prepared> {
   const sniffed = await sniffFile(input)
   if (!sniffed) throw new Error("Not a PNG, JPG, GIF or WebP")
@@ -42,12 +44,17 @@ export async function prepareImage(input: File): Promise<Prepared> {
     if (sniffed.ext === "webp") {
       return {file: input, ...sniffed, width, height, thumb, stripped: false}
     }
-    const full = draw(bitmap, Number.POSITIVE_INFINITY)
-    const file =
-      sniffed.ext === "png"
-        ? await toBlob(full, "image/png")
-        : await toBlob(full, "image/jpeg", 0.92)
-    return {file, ...sniffed, width, height, thumb, stripped: true}
+    const original = new Uint8Array(await input.arrayBuffer())
+    const cleaned = stripMetadata(original, sniffed.ext)
+    const file = new Blob([cleaned], {type: sniffed.mime})
+    return {
+      file,
+      ...sniffed,
+      width,
+      height,
+      thumb,
+      stripped: cleaned.length !== original.length,
+    }
   } finally {
     bitmap.close()
   }

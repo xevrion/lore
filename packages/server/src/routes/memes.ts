@@ -9,6 +9,7 @@ import {dimensions, sniff} from "../lib/image"
 import {MEME_SELECT, toMeme, type MemeRow} from "../lib/meme"
 import {buildSearch, normalizeTags} from "../lib/search"
 import {sql} from "../lib/sql"
+import {stripMetadata} from "../lib/strip"
 import {LIMITS, type MemeList, type Sort} from "../lib/types"
 import {validate} from "../lib/validate"
 
@@ -104,10 +105,12 @@ export default app()
     if (file.size > LIMITS.fileBytes) {
       throw new HTTPException(413, {message: "Files must be under 10 MB"})
     }
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    const type = sniff(bytes)
+    const uploaded = new Uint8Array(await file.arrayBuffer())
+    const type = sniff(uploaded)
     if (!type)
       throw new HTTPException(415, {message: "Only png, jpg, gif and webp are accepted"})
+    // The client strips metadata before upload, but the client is not trusted.
+    const bytes = stripMetadata(uploaded, type.ext)
     const size = dimensions(bytes, type.ext)
     if (!size) throw new HTTPException(400, {message: "Could not read the image dimensions"})
 

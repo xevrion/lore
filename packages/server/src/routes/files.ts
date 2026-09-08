@@ -80,22 +80,20 @@ async function serve(c: Context, opts: ServeOptions) {
   }
   const resolved = await opts.resolve()
   if (!resolved) return opts.notFound()
-  if (isHead) {
-    const object = await c.env.BUCKET.head(resolved.key)
-    if (!object) return opts.notFound()
-    return new Response(null, {
-      headers: fileHeaders(object, resolved.contentType, opts.cacheControl),
-    })
-  }
   const object = await c.env.BUCKET.get(resolved.key)
   if (!object) return opts.notFound()
   const response = new Response(object.body, {
     headers: fileHeaders(object, resolved.contentType, opts.cacheControl),
   })
+  // Unfurlers send HEAD before GET, so a HEAD miss warms the cache too. Only a
+  // real GET counts as a fetch.
   c.executionCtx.waitUntil(
-    Promise.all([caches.default.put(cacheKey, response.clone()), resolved.onMiss?.()]),
+    Promise.all([
+      caches.default.put(cacheKey, isHead ? response : response.clone()),
+      isHead ? undefined : resolved.onMiss?.(),
+    ]),
   )
-  return response
+  return isHead ? new Response(null, {headers: response.headers}) : response
 }
 
 interface FileRow {
