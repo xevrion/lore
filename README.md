@@ -6,6 +6,8 @@
 
 ---
 
+![The lore wall: a masonry grid of memes and GIFs with a hover overlay showing the title, uploader and copy count](docs/assets/gallery.webp)
+
 Every friend group has a pile of images that get reposted for years. Screenshots of
 someone's typo, that one reaction GIF, the photo nobody is allowed to delete. They
 live scattered across chat history and camera rolls, and finding the right one at the
