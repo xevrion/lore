@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /settings
+Disallow: /join/
+Disallow: /login
+
+Sitemap: https://lore.xevrion.dev/sitemap.xml
