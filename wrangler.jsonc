@@ -19,7 +19,7 @@
     // Display name for the owner account, created on first login.
     "OWNER_NAME": "owner",
     // Uploads are refused past this many bytes so R2 never leaves its free tier.
-    "STORAGE_CAP_BYTES": "9663676416",
+    "STORAGE_CAP_BYTES": "8000000000",
     // Cloudflare Web Analytics beacon token. Leave empty to disable.
     "WEB_ANALYTICS_TOKEN": "0eefd4b38854466e9fc5ef41533dc64c",
     // Optional Discord sign-in. Pair it with the DISCORD_CLIENT_SECRET secret,
@@ -63,7 +63,7 @@
     {
       "name": "RATELIMIT_API",
       "namespace_id": "1001",
-      "simple": {"limit": 300, "period": 60},
+      "simple": {"limit": 120, "period": 60},
     },
     {
       "name": "RATELIMIT_AUTH",

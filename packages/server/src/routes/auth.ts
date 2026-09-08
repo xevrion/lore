@@ -52,43 +52,76 @@ const nameSchema = z.string().trim().min(1, "Pick a name").max(LIMITS.nameChars)
 
 // A six digit code is guessable given enough tries, and the rate limiter alone
 // still allows thousands of attempts a day. After three misses the lockout
-// doubles each time, from a minute up to a day, and is global on purpose so
-// rotating IPs does not help.
+// doubles each time. Two locks run side by side: a global one, capped at an hour
+// so a stranger cannot keep the owner out for long, and one per address capped
+// at a day, which is what actually stops a guesser rotating through codes.
 const LOCK_AFTER = 3
-const LOCK_CAP_MINUTES = 24 * 60
+const GLOBAL_CAP_MINUTES = 60
+const IP_CAP_MINUTES = 24 * 60
 
 interface LockRow {
   failures: number
   locked_until: string | null
 }
 
+const clientIp = (c: Context) => c.req.header("cf-connecting-ip") ?? "unknown"
+
+const lockedUntil = (failures: number, capMinutes: number) =>
+  failures >= LOCK_AFTER
+    ? new Date(
+        Date.now() + Math.min(2 ** (failures - LOCK_AFTER), capMinutes) * 60_000,
+      ).toISOString()
+    : null
+
+function tooMany(until: string | null | undefined): never | void {
+  const at = until ? new Date(until).getTime() : 0
+  if (at <= Date.now()) return
+  const minutes = Math.max(1, Math.ceil((at - Date.now()) / 60_000))
+  throw new HTTPException(429, {
+    message: `Too many wrong codes. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+  })
+}
+
 async function assertNotLocked(c: Context) {
-  const lock = await sql(
-    c.env.DB,
-  )`select failures, locked_until from login_lock where id = 1`.first<LockRow>()
-  const until = lock?.locked_until ? new Date(lock.locked_until).getTime() : 0
-  if (until > Date.now()) {
-    const minutes = Math.max(1, Math.ceil((until - Date.now()) / 60_000))
-    throw new HTTPException(429, {
-      message: `Too many wrong codes. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
-    })
-  }
+  const ipHash = await hashToken(clientIp(c))
+  const [global, own] = await Promise.all([
+    sql(c.env.DB)`select failures, locked_until from login_lock where id = 1`.first<LockRow>(),
+    sql(c.env.DB)`
+      select failures, locked_until from login_lock_ip where ip_hash = ${ipHash}
+    `.first<LockRow>(),
+  ])
+  tooMany(own?.locked_until)
+  tooMany(global?.locked_until)
 }
 
 async function recordFailure(c: Context) {
-  const lock = await sql(
-    c.env.DB,
-  )`select failures, locked_until from login_lock where id = 1`.first<LockRow>()
-  const failures = (lock?.failures ?? 0) + 1
-  const lockedUntil =
-    failures >= LOCK_AFTER
-      ? new Date(
-          Date.now() + Math.min(2 ** (failures - LOCK_AFTER), LOCK_CAP_MINUTES) * 60_000,
-        ).toISOString()
-      : null
-  await sql(c.env.DB)`
-    update login_lock set failures = ${failures}, locked_until = ${lockedUntil} where id = 1
-  `.run()
+  const ipHash = await hashToken(clientIp(c))
+  const [global, own] = await Promise.all([
+    sql(c.env.DB)`select failures from login_lock where id = 1`.first<LockRow>(),
+    sql(
+      c.env.DB,
+    )`select failures from login_lock_ip where ip_hash = ${ipHash}`.first<LockRow>(),
+  ])
+  const globalFailures = (global?.failures ?? 0) + 1
+  const ownFailures = (own?.failures ?? 0) + 1
+  await c.env.DB.batch([
+    c.env.DB.prepare("update login_lock set failures = ?, locked_until = ? where id = 1").bind(
+      globalFailures,
+      lockedUntil(globalFailures, GLOBAL_CAP_MINUTES),
+    ),
+    c.env.DB.prepare(
+      `insert into login_lock_ip (ip_hash, failures, locked_until) values (?, ?, ?)
+       on conflict (ip_hash) do update set failures = excluded.failures, locked_until = excluded.locked_until`,
+    ).bind(ipHash, ownFailures, lockedUntil(ownFailures, IP_CAP_MINUTES)),
+  ])
+}
+
+async function clearLocks(c: Context) {
+  const ipHash = await hashToken(clientIp(c))
+  await c.env.DB.batch([
+    c.env.DB.prepare("update login_lock set failures = 0, locked_until = null where id = 1"),
+    c.env.DB.prepare("delete from login_lock_ip where ip_hash = ?").bind(ipHash),
+  ])
 }
 
 export default app()
@@ -107,9 +140,7 @@ export default app()
         await recordFailure(c)
         throw new HTTPException(400, {message: "Wrong code"})
       }
-      await sql(
-        c.env.DB,
-      )`update login_lock set failures = 0, locked_until = null where id = 1`.run()
+      await clearLocks(c)
       // The owner row is created on first login so setup needs nothing but the secret.
       await sql(c.env.DB)`
       insert into user (id, name, role, color, created_at)

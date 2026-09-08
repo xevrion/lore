@@ -130,13 +130,17 @@ describe("login lockout", () => {
     await sql(
       env.DB,
     )`update login_lock set failures = 0, locked_until = null where id = 1`.run()
+    await sql(env.DB)`delete from login_lock_ip`.run()
     for (let i = 0; i < 3; i++) expect((await attempt("000000")).status).toBe(400)
     const locked = await attempt(await totpCode())
     expect(locked.status).toBe(429)
     expect(((await locked.json()) as {error: string}).error).toMatch(/Try again in 1 minute/)
+    // Clearing the shared lock is not enough: the address that guessed stays out.
     await sql(
       env.DB,
     )`update login_lock set failures = 0, locked_until = null where id = 1`.run()
+    expect((await attempt(await totpCode())).status).toBe(429)
+    await sql(env.DB)`delete from login_lock_ip`.run()
     expect((await attempt(await totpCode())).status).toBe(200)
   })
 })

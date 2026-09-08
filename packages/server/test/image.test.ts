@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest"
 
-import {dimensions, sniff} from "../src/lib/image"
+import {dimensions, parseDimensions, sniff} from "../src/lib/image"
 import {TINY_GIF, TINY_PNG} from "./helpers"
 
 const bytes = (...parts: (number[] | string)[]) =>
@@ -84,5 +84,26 @@ describe("dimensions", () => {
   it("returns null for truncated files", () => {
     expect(dimensions(TINY_PNG.subarray(0, 20), "png")).toBeNull()
     expect(dimensions(jpeg.subarray(0, 12), "jpg")).toBeNull()
+  })
+})
+
+// A PNG header with any width and height; the pixel data is irrelevant here.
+const pngHeader = (width: number, height: number) =>
+  bytes(
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13],
+    "IHDR",
+    [(width >>> 24) & 255, (width >>> 16) & 255, (width >>> 8) & 255, width & 255],
+    [(height >>> 24) & 255, (height >>> 16) & 255, (height >>> 8) & 255, height & 255],
+    [8, 6, 0, 0, 0],
+  )
+
+describe("dimension limits", () => {
+  it("parses but refuses sizes no meme wall needs", () => {
+    expect(parseDimensions(pngHeader(20_000, 10), "png")).toEqual({width: 20_000, height: 10})
+    expect(dimensions(pngHeader(20_000, 10), "png")).toBeNull()
+    expect(dimensions(pngHeader(1, 2_000_000_000), "png")).toBeNull()
+    expect(dimensions(pngHeader(1, 20), "png")).toBeNull()
+    expect(dimensions(pngHeader(7000, 7000), "png")).toBeNull()
+    expect(dimensions(pngHeader(4000, 3000), "png")).toEqual({width: 4000, height: 3000})
   })
 })

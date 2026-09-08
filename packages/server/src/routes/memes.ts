@@ -5,7 +5,7 @@ import {getSession, hashToken, requireUser} from "../auth"
 import {app, isStaff, now, origin, storageCap, type Context, type SessionUser} from "../lib/app"
 import {decodeCursor, encodeCursor} from "../lib/cursor"
 import {uniqueMemeId} from "../lib/id"
-import {dimensions, sniff} from "../lib/image"
+import {dimensions, parseDimensions, sniff, withinLimits} from "../lib/image"
 import {MEME_SELECT, toMeme, type MemeRow} from "../lib/meme"
 import {deleteMemes, purgeMeme, quotaFor} from "../lib/moderation"
 import {buildSearch, normalizeTags} from "../lib/search"
@@ -88,6 +88,10 @@ async function findOwnOrStaff(c: Context, user: SessionUser, id: string) {
   return row
 }
 
+// Two percent covers rounding when the client scales the long edge to 640px.
+const sameShape = (a: {width: number; height: number}, b: {width: number; height: number}) =>
+  Math.abs(a.width / a.height - b.width / b.height) <= 0.02 * (a.width / a.height)
+
 async function checkMemberLimits(c: Context, user: SessionUser, ext: string, bytes: number) {
   if (ext === "gif" && bytes > LIMITS.memberGifBytes) {
     throw new HTTPException(413, {message: "GIFs from members must be under 5 MB"})
@@ -122,8 +126,13 @@ export default app()
   .post("/memes/:id/copy", async (c) => {
     const id = c.req.param("id")
     const ip = c.req.header("cf-connecting-ip") ?? "unknown"
-    const {success} = await c.env.RATELIMIT_COPY.limit({key: `${ip}:${id}`})
-    if (!success) throw new HTTPException(429, {message: "Slow down"})
+    // Per meme and per address: one D1 write per call is cheap until a script
+    // walks every meme on the wall.
+    const [perMeme, perIp] = await Promise.all([
+      c.env.RATELIMIT_COPY.limit({key: `${ip}:${id}`}),
+      c.env.RATELIMIT_COPY.limit({key: `copy:${ip}`}),
+    ])
+    if (!perMeme.success || !perIp.success) throw new HTTPException(429, {message: "Slow down"})
     c.executionCtx.waitUntil(
       sql(c.env.DB)`update meme set copies = copies + 1 where id = ${id}`.run(),
     )
@@ -174,16 +183,38 @@ export default app()
       throw new HTTPException(415, {message: "Only png, jpg, gif and webp are accepted"})
     // The client strips metadata before upload, but the client is not trusted.
     const bytes = stripMetadata(uploaded, type.ext)
-    const size = dimensions(bytes, type.ext)
+    const size = parseDimensions(bytes, type.ext)
     if (!size) throw new HTTPException(400, {message: "Could not read the image dimensions"})
+    if (!withinLimits(size)) {
+      throw new HTTPException(400, {message: "Image dimensions are out of range"})
+    }
 
+    // Animated GIFs are stored once and shown directly; a still thumbnail would
+    // defeat the point of a GIF wall. A thumbnail that is not the same shape as
+    // the file is refused: the wall would show one image and the link another.
+    let thumbBytes: Uint8Array | null = null
+    const thumb = form.get("thumb")
+    if (type.ext !== "gif" && thumb instanceof File && thumb.size > 0) {
+      const candidate = new Uint8Array(await thumb.arrayBuffer())
+      if (sniff(candidate)?.ext === "webp" && candidate.length <= 1024 * 1024) {
+        const thumbSize = dimensions(candidate, "webp")
+        if (!thumbSize || !sameShape(size, thumbSize)) {
+          throw new HTTPException(400, {message: "Thumbnail does not match the image"})
+        }
+        thumbBytes = candidate
+      }
+    }
+
+    // Every byte in the bucket counts: thumbnails, and avatars at their cap.
     const used = await sql(c.env.DB)`
-      select coalesce(sum(size + thumb_size), 0) as total from meme
+      select (select coalesce(sum(size + thumb_size), 0) from meme)
+        + (select count(*) from user where avatar_key is not null) * ${LIMITS.avatarBytes} as total
     `.first<{total: number}>()
-    if ((used?.total ?? 0) + bytes.length > storageCap(c.env)) {
+    const incoming = bytes.length + (thumbBytes?.length ?? 0)
+    if ((used?.total ?? 0) + incoming > storageCap(c.env)) {
       throw new HTTPException(507, {message: "The archive is full. Delete something first."})
     }
-    if (!isStaff(user)) await checkMemberLimits(c, user, type.ext, bytes.length)
+    if (!isStaff(user)) await checkMemberLimits(c, user, type.ext, incoming)
 
     const title = patchSchema.shape.title.parse(form.get("title") ?? "") ?? ""
     const tags = normalizeTags(String(form.get("tags") ?? ""))
@@ -192,21 +223,12 @@ export default app()
     // Untrusted members' uploads wait in the review queue.
     const status = user.trusted ? "live" : "pending"
 
-    // Animated GIFs are stored once and shown directly; a still thumbnail would
-    // defeat the point of a GIF wall.
     let thumbKey: string | null = null
-    let thumbSize = 0
-    const thumb = form.get("thumb")
-    if (type.ext !== "gif" && thumb instanceof File && thumb.size > 0) {
-      const thumbBytes = new Uint8Array(await thumb.arrayBuffer())
-      if (sniff(thumbBytes)?.ext === "webp" && thumbBytes.length <= 1024 * 1024) {
-        thumbKey = `${id}.t.webp`
-        thumbSize = thumbBytes.length
-        await c.env.BUCKET.put(thumbKey, thumbBytes, {
-          httpMetadata: {contentType: "image/webp"},
-        })
-      }
+    if (thumbBytes) {
+      thumbKey = `${id}.t.webp`
+      await c.env.BUCKET.put(thumbKey, thumbBytes, {httpMetadata: {contentType: "image/webp"}})
     }
+    const thumbSize = thumbBytes?.length ?? 0
     await c.env.BUCKET.put(key, bytes, {httpMetadata: {contentType: type.mime}})
     await sql(c.env.DB)`
       insert into meme (id, key, thumb_key, ext, mime, width, height, size, thumb_size, title, tags,

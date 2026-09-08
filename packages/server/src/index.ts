@@ -1,6 +1,7 @@
 import {HTTPException} from "hono/http-exception"
 
-import {app, type Context} from "./lib/app"
+import {app, requireSameOrigin, type Context} from "./lib/app"
+import {withSecurityHeaders} from "./lib/headers"
 import admin from "./routes/admin"
 import auth from "./routes/auth"
 import discord from "./routes/discord"
@@ -9,40 +10,24 @@ import memes from "./routes/memes"
 import page from "./routes/page"
 import users from "./routes/users"
 
-// Hash of the inline theme script in packages/client/index.html. If that script
-// changes, recompute with: sha256 of the text between <script> and </script>.
-const THEME_SCRIPT_HASH = "'sha256-+MhaSb7ZBUZppFXgeJSziTAA9mQue/2pPZYMlJxRK9E='"
-
-const CSP = [
-  "default-src 'self'",
-  `script-src 'self' ${THEME_SCRIPT_HASH} https://static.cloudflareinsights.com`,
-  "connect-src 'self' https://cloudflareinsights.com",
-  "img-src 'self' data: blob:",
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join("; ")
-
-const SECURITY_HEADERS: Record<string, string> = {
-  "content-security-policy": CSP,
-  "x-content-type-options": "nosniff",
-  "x-frame-options": "DENY",
-  "referrer-policy": "strict-origin-when-cross-origin",
-  "permissions-policy": "camera=(), microphone=(), geolocation=()",
-}
-
-const GUESSABLE = /^\/api\/auth\/(login|join|invite|discord)/
+const GUESSABLE = /^\/api\/auth\/(login|join)$/
+const MUTATING = new Set(["POST", "PATCH", "DELETE"])
 
 async function rateLimit(c: Context, next: () => Promise<void>) {
+  const ip = c.req.header("cf-connecting-ip") ?? "unknown"
   // Code and invite guessing is throttled globally: there is one account to
-  // guess. Everything else, /auth/me included, gets the per-IP budget.
-  const outcome = GUESSABLE.test(c.req.path)
-    ? await c.env.RATELIMIT_AUTH.limit({key: "auth"})
-    : await c.env.RATELIMIT_API.limit({key: c.req.header("cf-connecting-ip") ?? "unknown"})
-  if (!outcome.success) throw new HTTPException(429, {message: "Too many requests"})
+  // guess. The per-IP check runs first so one address cannot spend the shared
+  // budget and lock everyone else out. Everything else gets the per-IP budget.
+  if (GUESSABLE.test(c.req.path) && c.req.method === "POST") {
+    const own = await c.env.RATELIMIT_AUTH.limit({key: `login:${ip}`})
+    if (!own.success) throw new HTTPException(429, {message: "Too many requests"})
+    const shared = await c.env.RATELIMIT_AUTH.limit({key: "auth"})
+    if (!shared.success) throw new HTTPException(429, {message: "Too many requests"})
+  } else {
+    const outcome = await c.env.RATELIMIT_API.limit({key: ip})
+    if (!outcome.success) throw new HTTPException(429, {message: "Too many requests"})
+  }
+  if (MUTATING.has(c.req.method)) requireSameOrigin(c)
   await next()
 }
 
@@ -50,10 +35,11 @@ async function rateLimit(c: Context, next: () => Promise<void>) {
 // security headers and, when configured, the Cloudflare Web Analytics beacon.
 async function serveAsset(c: Context) {
   const upstream = await c.env.ASSETS.fetch(c.req.raw)
-  const headers = new Headers(upstream.headers)
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value)
+  const headers = withSecurityHeaders(new Headers(upstream.headers))
   const isHtml = (upstream.headers.get("content-type") ?? "").includes("text/html")
-  const token = c.env.WEB_ANALYTICS_TOKEN
+  // The beacon reports the page path, and an invite link is a live credential
+  // until it is used, so join pages go unmeasured.
+  const token = c.req.path.startsWith("/join/") ? "" : c.env.WEB_ANALYTICS_TOKEN
   if (!isHtml || !token) {
     return new Response(upstream.body, {status: upstream.status, headers})
   }

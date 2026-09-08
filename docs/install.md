@@ -68,6 +68,12 @@ If you want a different display name than `owner`, edit `OWNER_NAME` in
 `wrangler.jsonc` before your first login. The owner account is created the first
 time a valid code is entered.
 
+Three wrong codes in a row lock the login: for the address that got them wrong,
+doubling each time up to a day, and for everyone for a shorter spell capped at an
+hour. If you ever find yourself locked out, or lose the authenticator, connect your
+Discord account from `/settings` while you are signed in; that gives you a second
+way back in that does not depend on the code.
+
 ## Deploy
 
 ```sh
@@ -199,6 +205,10 @@ pnpm run build
 ```
 
 ## Limits worth knowing
+
+lore stops accepting uploads at 8 GB (`STORAGE_CAP_BYTES` in `wrangler.jsonc`),
+counting thumbnails and avatars, so the bucket never reaches the point where R2
+starts billing.
 
 Cloudflare's free tier gives you 10 GB of R2 storage, 5 GB of D1, 100,000 Worker
 requests a day and a generous number of D1 reads. A friend group with a few

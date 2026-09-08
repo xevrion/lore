@@ -3,12 +3,14 @@ import {beforeAll, describe, expect, it} from "vitest"
 
 import app from "../src/index"
 import type {Meme, MemeList} from "../src/lib/types"
+import {viewSample} from "../src/routes/files"
 import {loginAsOwner, ORIGIN, TINY_GIF, TINY_PNG, upload} from "./helpers"
 
 let owner = ""
 
 describe("uploads", () => {
   beforeAll(async () => {
+    viewSample.roll = () => true
     owner = await loginAsOwner()
   })
 

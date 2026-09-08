@@ -28,16 +28,19 @@ describe("buildSearch", () => {
     expect(buildSearch("   ")).toEqual({where: "1 = 1", params: []})
   })
 
-  it("ands every term across title and tags", () => {
+  it("quotes every term, ands them and makes the last one a prefix", () => {
     const {where, params} = buildSearch("Cat  GIF")
-    expect(where.split(" and ")).toHaveLength(2)
-    expect(where).toContain("m.title like ?")
-    expect(where).toContain("m.tags like ?")
-    expect(params).toEqual(["%cat%", "%cat%", "%gif%", "%gif%"])
+    expect(where).toContain("meme_fts match ?")
+    expect(params).toEqual(['"cat" "gif"*'])
   })
 
-  it("escapes like wildcards so they match literally", () => {
-    expect(buildSearch("100%_a\\b").params[0]).toBe("%100\\%\\_a\\\\b%")
+  it("keeps quotes and operators literal", () => {
+    expect(buildSearch('a"b -c OR dd').params[0]).toBe('"a""b" "-c" "or" "dd"*')
+  })
+
+  it("drops one-letter terms and matches nothing when none remain", () => {
+    expect(buildSearch("a b")).toEqual({where: "0 = 1", params: []})
+    expect(buildSearch("a cat").params).toEqual(['"cat"*'])
   })
 })
 

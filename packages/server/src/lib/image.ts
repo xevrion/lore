@@ -96,7 +96,20 @@ function webpSize(b: Uint8Array): Dimensions | null {
   return null
 }
 
-export function dimensions(bytes: Uint8Array, ext: Ext): Dimensions | null {
+// Headers are trusted for layout, so a 1 by two-billion PNG would give every
+// visitor a card taller than the page. Anything past a poster-sized image or a
+// 10:1 strip is refused; nothing on a meme wall needs more.
+export const MAX_EDGE = 16_384
+export const MAX_PIXELS = 40_000_000
+export const MAX_RATIO = 10
+
+export const withinLimits = ({width, height}: Dimensions) =>
+  width <= MAX_EDGE &&
+  height <= MAX_EDGE &&
+  width * height <= MAX_PIXELS &&
+  Math.max(width, height) <= MAX_RATIO * Math.min(width, height)
+
+export function parseDimensions(bytes: Uint8Array, ext: Ext): Dimensions | null {
   const size =
     ext === "png"
       ? pngSize(bytes)
@@ -107,4 +120,9 @@ export function dimensions(bytes: Uint8Array, ext: Ext): Dimensions | null {
           : webpSize(bytes)
   if (!size || size.width <= 0 || size.height <= 0) return null
   return size
+}
+
+export function dimensions(bytes: Uint8Array, ext: Ext): Dimensions | null {
+  const size = parseDimensions(bytes, ext)
+  return size && withinLimits(size) ? size : null
 }

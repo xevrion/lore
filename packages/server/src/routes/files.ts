@@ -1,4 +1,4 @@
-import {app, origin, type Context} from "../lib/app"
+import {app, cacheOrigin, type Context} from "../lib/app"
 import {AVATAR_VERSION, avatarKey} from "../lib/avatar"
 import {GONE_PNG} from "../lib/gone"
 import {sql} from "../lib/sql"
@@ -21,6 +21,38 @@ interface ServeOptions {
   resolve: () => Promise<Resolved | null>
   cacheControl: string
   notFound: () => Response
+  // Whether the not-found response may sit in the edge cache for its max-age,
+  // so a scan of made-up ids costs one D1 read per id per minute, not per hit.
+  cacheNotFound?: boolean
+}
+
+// Views are sampled: one write in ten, counted as ten, so a flood of forced cache
+// misses cannot turn the counter into a D1 write amplifier. Tests pin the roll.
+export const viewSample = {
+  roll: () => Math.random() < 0.1,
+  weight: 10,
+}
+
+// A single closed or open-ended byte range; anything fancier goes to R2 as is.
+function parseRange(header: string, size: number) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header)
+  if (!m || (m[1] === "" && m[2] === "")) return null
+  const start = m[1] === "" ? Math.max(0, size - Number(m[2])) : Number(m[1])
+  const end = m[1] !== "" && m[2] !== "" ? Math.min(Number(m[2]), size - 1) : size - 1
+  if (Number.isNaN(start) || start > end || start >= size) return null
+  return {start, end}
+}
+
+// Range requests used to skip the cache entirely, which made them the cheapest
+// way to keep R2 busy. When the full object is cached the slice comes from it.
+async function rangeFromCache(hit: Response, rangeHeader: string) {
+  const buffer = await hit.arrayBuffer()
+  const range = parseRange(rangeHeader, buffer.byteLength)
+  if (!range) return null
+  const headers = new Headers(hit.headers)
+  headers.set("content-length", String(range.end - range.start + 1))
+  headers.set("content-range", `bytes ${range.start}-${range.end}/${buffer.byteLength}`)
+  return new Response(buffer.slice(range.start, range.end + 1), {status: 206, headers})
 }
 
 const gone = () =>
@@ -68,20 +100,30 @@ async function serveRange(c: Context, resolved: Resolved, cacheControl: string) 
 async function serve(c: Context, opts: ServeOptions) {
   const isHead = c.req.method === "HEAD"
   // Keyed on the same origin the delete handler purges, not on request.url.
-  const cacheKey = new Request(`${origin(c)}${new URL(c.req.url).pathname}`, {method: "GET"})
-  if (c.req.header("range")) {
+  const cacheKey = new Request(`${cacheOrigin(c)}${new URL(c.req.url).pathname}`, {
+    method: "GET",
+  })
+  const hit = await caches.default.match(cacheKey)
+  const range = c.req.header("range")
+  if (range) {
+    const cached = hit && hit.ok ? await rangeFromCache(hit, range) : null
+    if (cached) return cached
     const resolved = await opts.resolve()
     const partial = resolved && (await serveRange(c, resolved, opts.cacheControl))
     return partial ?? opts.notFound()
   }
-  const hit = await caches.default.match(cacheKey)
   if (hit) {
     return isHead ? new Response(null, {status: hit.status, headers: hit.headers}) : hit
   }
   const resolved = await opts.resolve()
-  if (!resolved) return opts.notFound()
-  const object = await c.env.BUCKET.get(resolved.key)
-  if (!object) return opts.notFound()
+  const object = resolved && (await c.env.BUCKET.get(resolved.key))
+  if (!object) {
+    const missing = opts.notFound()
+    if (opts.cacheNotFound) {
+      c.executionCtx.waitUntil(caches.default.put(cacheKey, missing.clone()))
+    }
+    return missing
+  }
   const response = new Response(object.body, {
     headers: fileHeaders(object, resolved.contentType, opts.cacheControl),
   })
@@ -118,6 +160,7 @@ export default app()
     return serve(c, {
       cacheControl: IMMUTABLE,
       notFound: gone,
+      cacheNotFound: true,
       resolve: async () => {
         const row = await findFile(c, id ?? "")
         // Serving a GIF at a .png URL confuses unfurlers, so the extension must match.
@@ -125,7 +168,12 @@ export default app()
         return {
           key: row.key,
           contentType: row.mime,
-          onMiss: () => sql(c.env.DB)`update meme set views = views + 1 where id = ${id}`.run(),
+          onMiss: async () => {
+            if (!viewSample.roll()) return
+            await sql(c.env.DB)`
+              update meme set views = views + ${viewSample.weight} where id = ${id}
+            `.run()
+          },
         }
       },
     })
@@ -138,6 +186,7 @@ export default app()
     return serve(c, {
       cacheControl: IMMUTABLE,
       notFound: gone,
+      cacheNotFound: true,
       resolve: async () => {
         const row = await findFile(c, id)
         if (!row) return null

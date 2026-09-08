@@ -75,6 +75,10 @@ async function maybeTrust(c: Context, uploaderId: string) {
 export default app()
   .get("/admin/stats", async (c) => {
     await requireStaff(c)
+    // Expired sessions are otherwise only removed when their token shows up again.
+    c.executionCtx.waitUntil(
+      sql(c.env.DB)`delete from session where expires_at < ${now()}`.run(),
+    )
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     // Storage counts everything on disk; the other numbers describe the public wall.
     const [totals, recent, top, uploaders] = await c.env.DB.batch([

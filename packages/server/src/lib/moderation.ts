@@ -1,5 +1,5 @@
 import type {Context} from "./app"
-import {memberDailyUploads, memberQuotaBytes, origin} from "./app"
+import {cacheOrigin, memberDailyUploads, memberQuotaBytes} from "./app"
 import type {MemeRow} from "./meme"
 import {sql} from "./sql"
 import type {Quota} from "./types"
@@ -24,8 +24,8 @@ export async function quotaFor(c: Context, userId: string): Promise<Quota> {
 }
 
 export const fileUrls = (c: Context, row: Pick<MemeRow, "id" | "ext">) => [
-  `${origin(c)}/i/${row.id}.${row.ext}`,
-  `${origin(c)}/t/${row.id}.webp`,
+  `${cacheOrigin(c)}/i/${row.id}.${row.ext}`,
+  `${cacheOrigin(c)}/t/${row.id}.webp`,
 ]
 
 // The Cache API only purges this colo; other colos age out on their own. Each
