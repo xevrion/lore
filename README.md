@@ -28,8 +28,9 @@ Cloudflare's edge cache without touching either. A group of twenty people with a
 thousand memes fits in the free tier with room to spare.
 
 **No passwords.** The owner signs in with a six digit authenticator code. Friends
-join through invite links that work exactly once and expire in a day. Visitors need
-nothing at all.
+join through invite links that work exactly once and expire in a day. Turn on the
+optional Discord login and they can get back in from any device with one click.
+Visitors need nothing at all.
 
 **Uploads that are careful with your data.** JPGs and PNGs are re-encoded in the
 browser before upload, so EXIF (camera model, GPS position) never reaches the
@@ -42,6 +43,7 @@ server. Every file is checked by its magic bytes, not its extension.
 - Sort by newest or most copied
 - Drag and drop, paste from the clipboard, or pick up to 30 files at once, three uploading in parallel with progress
 - Every meme shows who added it
+- Optional Discord sign-in so friends can log in on a new device without a fresh invite
 - Any admin can edit titles and tags or delete anything
 - Owner dashboard: storage used, copy counts, top memes, top uploaders, pending invites, revoke with one click
 - Dark theme by default, light theme a toggle away

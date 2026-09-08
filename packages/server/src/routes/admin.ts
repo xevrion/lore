@@ -18,6 +18,7 @@ interface UserRow {
   revoked_at: string | null
   upload_count: number
   last_seen_at: string | null
+  discord_id: string | null
 }
 
 interface Totals {
@@ -75,7 +76,7 @@ export default app()
   .get("/admin/users", async (c) => {
     await requireOwner(c)
     const {results} = await sql(c.env.DB)`
-      select u.id, u.name, u.role, u.color, u.avatar_key, u.created_at, u.revoked_at,
+      select u.id, u.name, u.role, u.color, u.avatar_key, u.created_at, u.revoked_at, u.discord_id,
         (select count(*) from meme where uploader_id = u.id) as upload_count,
         (select max(last_seen_at) from session where user_id = u.id) as last_seen_at
       from user u order by u.created_at asc
@@ -87,6 +88,7 @@ export default app()
       createdAt: u.created_at,
       revokedAt: u.revoked_at,
       lastSeenAt: u.last_seen_at,
+      discordLinked: u.discord_id !== null,
     }))
     return c.json(users)
   })

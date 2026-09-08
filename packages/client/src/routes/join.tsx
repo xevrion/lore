@@ -4,9 +4,10 @@ import {useState} from "react"
 import {useNavigate, useParams} from "react-router"
 import {toast} from "sonner"
 
-import {api, ApiError, meQueryKey} from "@/api"
+import {api, ApiError, meQueryKey, useAuthConfig} from "@/api"
 import {AvatarPicker} from "@/components/avatar-picker"
-import {Button} from "@/components/ui/button"
+import {DiscordMark} from "@/components/discord-mark"
+import {Button, buttonVariants} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import {Wordmark} from "@/components/wordmark"
 
@@ -21,6 +22,8 @@ export default function Join() {
   const [avatar, setAvatar] = useState<Blob | null>(null)
   const [busy, setBusy] = useState(false)
   const color = palette[(token.charCodeAt(0) || 0) % palette.length]!
+  const {data: config} = useAuthConfig()
+  const discord = config?.discord === true
 
   const invite = useQuery({
     queryKey: ["invite", token],
@@ -75,9 +78,27 @@ export default function Join() {
                 You've been invited to lore
               </h1>
               <p className="text-sm text-muted-foreground">
-                Pick a name your friends will recognise. No password, the link is the key.
+                {discord
+                  ? "Sign in with Discord and you can get back in from any device."
+                  : "Pick a name your friends will recognise. No password, the link is the key."}
               </p>
             </div>
+            {discord && (
+              <>
+                <a
+                  href={`/api/auth/discord/start?invite=${encodeURIComponent(token)}`}
+                  className={buttonVariants({className: "pressable w-full"})}
+                >
+                  <DiscordMark className="size-4" />
+                  Continue with Discord
+                </a>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="h-px flex-1 bg-border" />
+                  or just pick a name
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              </>
+            )}
             <div className="grid gap-2">
               <label htmlFor="join-name" className="text-sm font-medium">
                 Display name
@@ -93,7 +114,12 @@ export default function Join() {
               />
             </div>
             <AvatarPicker name={name} color={color} currentUrl={null} onChange={setAvatar} />
-            <Button type="submit" disabled={busy || !name.trim()} className="pressable">
+            <Button
+              type="submit"
+              variant={discord ? "outline" : "default"}
+              disabled={busy || !name.trim()}
+              className="pressable"
+            >
               Join
             </Button>
           </form>

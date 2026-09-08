@@ -20,10 +20,8 @@
     "OWNER_NAME": "owner",
     // Cloudflare Web Analytics beacon token. Leave empty to disable.
     "WEB_ANALYTICS_TOKEN": "",
-  },
-
-  "secrets": {
-    "required": ["TOTP_SECRET"],
+    // Optional Discord sign-in: add "DISCORD_CLIENT_ID": "..." here and set the
+    // DISCORD_CLIENT_SECRET secret. See docs/install.md.
   },
 
   "d1_databases": [

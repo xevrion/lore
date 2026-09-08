@@ -8,6 +8,7 @@ export interface SessionUser {
   role: "owner" | "admin"
   color: string
   avatarKey: string | null
+  discordId: string | null
 }
 
 export type AppEnv = {

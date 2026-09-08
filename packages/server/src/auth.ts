@@ -45,6 +45,7 @@ interface SessionRow {
   role: "owner" | "admin"
   color: string
   avatar_key: string | null
+  discord_id: string | null
 }
 
 export interface Session {
@@ -58,7 +59,7 @@ export interface Session {
 export async function lookupSession(db: D1Database, token: string): Promise<Session | null> {
   const tokenHash = await hashToken(token)
   const row = await sql(db)`
-    select s.token_hash, s.expires_at, u.id, u.name, u.role, u.color, u.avatar_key
+    select s.token_hash, s.expires_at, u.id, u.name, u.role, u.color, u.avatar_key, u.discord_id
     from session s join user u on u.id = s.user_id
     where s.token_hash = ${tokenHash} and u.revoked_at is null
   `.first<SessionRow>()
@@ -75,6 +76,7 @@ export async function lookupSession(db: D1Database, token: string): Promise<Sess
       role: row.role,
       color: row.color,
       avatarKey: row.avatar_key,
+      discordId: row.discord_id,
     },
     expiresAt: row.expires_at,
     refresh: expires - Date.now() < SESSION_TTL_MS - REFRESH_AFTER_MS,

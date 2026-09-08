@@ -1,14 +1,25 @@
 import {useQueryClient} from "@tanstack/react-query"
 import {useEffect, useRef, useState} from "react"
-import {useNavigate} from "react-router"
+import {useNavigate, useSearchParams} from "react-router"
 
-import {api, ApiError, meQueryKey, useMe} from "@/api"
+import {api, ApiError, meQueryKey, useAuthConfig, useMe} from "@/api"
+import {DiscordMark} from "@/components/discord-mark"
+import {buttonVariants} from "@/components/ui/button"
 import {InputOTP, InputOTPGroup, InputOTPSlot} from "@/components/ui/input-otp"
 import {Wordmark} from "@/components/wordmark"
 import {cn} from "@/lib/utils"
 
+const oauthErrors: Record<string, string> = {
+  revoked: "Your access was revoked. Ask the owner for a new invite.",
+  "not-invited": "That Discord account hasn't been invited yet.",
+  oauth: "Discord sign-in didn't complete. Try again.",
+}
+
 export default function Login() {
   const {data: me} = useMe()
+  const {data: config} = useAuthConfig()
+  const [params] = useSearchParams()
+  const oauthError = oauthErrors[params.get("error") ?? ""]
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [code, setCode] = useState("")
@@ -88,6 +99,27 @@ export default function Login() {
             {state === "wrong" ? "Wrong code" : "Enter the code from your authenticator app"}
           </p>
         </div>
+        {config?.discord && (
+          <div className="grid w-full gap-4">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <a
+              href="/api/auth/discord/start"
+              className={buttonVariants({variant: "outline", className: "pressable w-full"})}
+            >
+              <DiscordMark className="size-4" />
+              Continue with Discord
+            </a>
+            {oauthError && (
+              <p role="alert" className="text-center text-sm text-destructive">
+                {oauthError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </main>
   )

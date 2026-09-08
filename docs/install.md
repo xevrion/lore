@@ -106,6 +106,39 @@ JavaScript snippet (the `"token"` value). Paste it into `WEB_ANALYTICS_TOKEN` in
 Per meme copy and fetch counts are stored in D1 and shown in the app itself. They
 need no setup.
 
+## Optional: Discord login
+
+Out of the box an invite link is the whole login: a friend opens it, picks a name,
+and gets a cookie that lasts 30 days on that device. If they want in from their phone
+too, they need a second invite. Discord login removes that step. Friends claim the
+invite with their Discord account and can sign in again on any device from the
+login page, and you can see which Discord account each admin is in `/admin`.
+
+1. Go to the [Discord developer portal](https://discord.com/developers/applications),
+   create an application, open its **OAuth2** tab.
+2. Add `https://lore.example.com/api/auth/discord/callback` as a redirect URL.
+3. Copy the **Client ID** into `wrangler.jsonc` under `vars`:
+
+   ```jsonc
+   "vars": {
+     "DISCORD_CLIENT_ID": "123456789012345678",
+   },
+   ```
+
+4. Reset and copy the **Client Secret**, then run:
+
+   ```sh
+   pnpm exec wrangler secret put DISCORD_CLIENT_SECRET
+   ```
+
+5. Deploy again.
+
+The login and join pages now show a "Continue with Discord" button. Existing admins
+can connect their Discord account from `/settings`. Invites still come from `/admin`
+as described above; Discord only changes how a friend proves it is them.
+
+For local development put both values in `.dev.vars` instead.
+
 ## Local development
 
 ```sh

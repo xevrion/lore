@@ -346,6 +346,7 @@ function Admins({ownerId}: {ownerId: string}) {
                 >
                   {u.role}
                 </Badge>
+                {u.discordLinked && <Badge variant="outline">Discord</Badge>}
                 {u.revokedAt && <Badge variant="outline">revoked</Badge>}
               </div>
               <span className="hidden text-muted-foreground tabular-nums sm:block">

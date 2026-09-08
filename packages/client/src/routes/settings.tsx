@@ -3,13 +3,14 @@ import {LIMITS} from "@lore/server/types"
 import {useQueryClient} from "@tanstack/react-query"
 import {useEffect, useState} from "react"
 import type {ReactNode} from "react"
-import {useNavigate} from "react-router"
+import {useNavigate, useSearchParams} from "react-router"
 import {toast} from "sonner"
 
-import {api, meQueryKey, useMe} from "@/api"
+import {api, meQueryKey, useAuthConfig, useMe} from "@/api"
 import {AvatarPicker} from "@/components/avatar-picker"
+import {DiscordMark} from "@/components/discord-mark"
 import {Header} from "@/components/header"
-import {Button} from "@/components/ui/button"
+import {Button, buttonVariants} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import {Switch} from "@/components/ui/switch"
 import {useTheme} from "@/lib/theme"
@@ -30,6 +31,7 @@ export default function Settings() {
       <main className="mx-auto w-full max-w-lg px-4 py-10 sm:px-6">
         <h1 className="mb-8 text-xl font-semibold tracking-tight">Settings</h1>
         <ProfileForm key={me.id} me={me} />
+        <Discord me={me} />
         <Appearance />
         <Sessions />
       </main>
@@ -94,6 +96,40 @@ function ProfileForm({me}: {me: Me}) {
         </div>
       </Section>
     </form>
+  )
+}
+
+function Discord({me}: {me: Me}) {
+  const {data: config} = useAuthConfig()
+  const [params] = useSearchParams()
+  if (!config?.discord) return null
+  return (
+    <Section
+      title="Discord"
+      body="Connect your Discord account to sign in here from other devices without a new invite."
+    >
+      {me.discordLinked ? (
+        <p className="flex items-center gap-2 text-sm">
+          <DiscordMark className="size-4 text-muted-foreground" />
+          Connected
+        </p>
+      ) : (
+        <div className="grid gap-2">
+          <a
+            href="/api/auth/discord/start?link=1"
+            className={buttonVariants({variant: "outline", className: "w-fit"})}
+          >
+            <DiscordMark className="size-4" />
+            Connect Discord
+          </a>
+          {params.get("error") === "discord-taken" && (
+            <p role="alert" className="text-sm text-destructive">
+              That Discord account is already connected to someone else.
+            </p>
+          )}
+        </div>
+      )}
+    </Section>
   )
 }
 

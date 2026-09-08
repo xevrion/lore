@@ -1,6 +1,7 @@
 import type {
   AdminStats,
   AdminUser,
+  AuthConfig,
   CreatedInvite,
   Me,
   Meme,
@@ -44,6 +45,7 @@ function json(method: string, body: unknown): RequestInit {
 
 export const api = {
   me: () => request<Me>("/auth/me"),
+  authConfig: () => request<AuthConfig>("/auth/config"),
   login: (totp: string) => request<Me>("/auth/login", json("POST", {totp})),
   logout: () => request<void>("/auth/logout", {method: "POST"}),
   logoutAll: () => request<void>("/auth/logout-all", {method: "POST"}),
@@ -98,6 +100,16 @@ export function useMe() {
       }
     },
     staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+}
+
+// Which sign-in methods this instance offers. Static per deploy, so cache hard.
+export function useAuthConfig() {
+  return useQuery({
+    queryKey: ["auth-config"],
+    queryFn: api.authConfig,
+    staleTime: Infinity,
     retry: false,
   })
 }

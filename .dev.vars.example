@@ -1,2 +1,5 @@
 # Copy to .dev.vars for local development. `node scripts/setup.ts` fills this in.
 TOTP_SECRET=
+# Optional Discord sign-in. Set both, and DISCORD_CLIENT_ID in wrangler.jsonc for production.
+# DISCORD_CLIENT_ID=
+# DISCORD_CLIENT_SECRET=

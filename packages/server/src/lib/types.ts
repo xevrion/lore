@@ -14,6 +14,7 @@ export interface UserSummary {
 
 export interface Me extends UserSummary {
   role: Role
+  discordLinked: boolean
 }
 
 export interface Meme {
@@ -46,6 +47,11 @@ export interface AdminUser extends UserSummary {
   createdAt: string
   revokedAt: string | null
   lastSeenAt: string | null
+  discordLinked: boolean
+}
+
+export interface AuthConfig {
+  discord: boolean
 }
 
 export interface PendingInvite {

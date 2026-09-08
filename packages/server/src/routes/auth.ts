@@ -20,34 +20,22 @@ import {app, now, origin, type Context, type SessionUser} from "../lib/app"
 import {storeAvatar} from "../lib/avatar"
 import {pickColor} from "../lib/colors"
 import {newId} from "../lib/id"
+import {checkInvite, consumeInvite, findInvite, markInviteUsedBy} from "../lib/invite"
 import {toUser} from "../lib/meme"
 import {sql} from "../lib/sql"
 import {LIMITS, type Me} from "../lib/types"
 import {validate} from "../lib/validate"
 
-const me = (c: Context, user: SessionUser): Me => ({
+export const me = (c: Context, user: SessionUser): Me => ({
   ...toUser(origin(c), user),
   role: user.role,
+  discordLinked: user.discordId !== null,
 })
 
-async function signIn(c: Context, user: SessionUser) {
+export async function signIn(c: Context, user: SessionUser) {
   const {token} = await createSession(c.env.DB, user.id, c.req.header("user-agent") ?? null)
   setSessionCookie(c, token)
   return me(c, user)
-}
-
-interface InviteRow {
-  used_at: string | null
-  expires_at: string
-}
-
-function checkInvite(invite: InviteRow | null) {
-  if (!invite) throw new HTTPException(404, {message: "This invite link is not valid"})
-  if (invite.used_at)
-    throw new HTTPException(410, {message: "This invite has already been used"})
-  if (new Date(invite.expires_at).getTime() <= Date.now()) {
-    throw new HTTPException(410, {message: "This invite has expired"})
-  }
 }
 
 const nameSchema = z.string().trim().min(1, "Pick a name").max(LIMITS.nameChars)
@@ -71,24 +59,24 @@ export default app()
       on conflict (id) do nothing
     `.run()
       const owner = await sql(c.env.DB)`
-      select id, name, role, color, avatar_key from user where id = 'owner'
+      select id, name, role, color, avatar_key, discord_id from user where id = 'owner'
     `.first<{
         id: string
         name: string
         role: "owner"
         color: string
         avatar_key: string | null
+        discord_id: string | null
       }>()
       if (!owner) throw new HTTPException(500, {message: "Owner account missing"})
-      return c.json(await signIn(c, {...owner, avatarKey: owner.avatar_key}))
+      return c.json(
+        await signIn(c, {...owner, avatarKey: owner.avatar_key, discordId: owner.discord_id}),
+      )
     },
   )
 
   .get("/auth/invite/:token", async (c) => {
-    const invite = await sql(c.env.DB)`
-      select used_at, expires_at from invite where token_hash = ${await hashToken(c.req.param("token"))}
-    `.first<InviteRow>()
-    checkInvite(invite)
+    checkInvite(await findInvite(c.env.DB, await hashToken(c.req.param("token"))))
     return c.json({ok: true})
   })
 
@@ -103,25 +91,16 @@ export default app()
     if (!name.success)
       throw new HTTPException(400, {message: name.error.issues[0]?.message ?? "Bad name"})
     const tokenHash = await hashToken(token)
-    const invite = await sql(c.env.DB)`
-      select used_at, expires_at from invite where token_hash = ${tokenHash}
-    `.first<InviteRow>()
-    checkInvite(invite)
+    checkInvite(await findInvite(c.env.DB, tokenHash))
     const user: SessionUser = {
       id: newId(10),
       name: name.data,
       role: "admin",
       color: pickColor(),
       avatarKey: null,
+      discordId: null,
     }
-    // Consuming the invite first, with the `used_at is null` guard, means two
-    // people racing on the same link cannot both get in.
-    const consumed = await sql(c.env.DB)`
-      update invite set used_at = ${now()} where token_hash = ${tokenHash} and used_at is null
-    `.run()
-    if (consumed.meta.changes !== 1) {
-      throw new HTTPException(410, {message: "This invite has already been used"})
-    }
+    await consumeInvite(c.env.DB, tokenHash)
     if (avatar instanceof File && avatar.size > 0) {
       user.avatarKey = await storeAvatar(c.env.BUCKET, user.id, avatar)
     }
@@ -129,9 +108,7 @@ export default app()
       insert into user (id, name, role, avatar_key, color, created_at)
       values (${user.id}, ${user.name}, 'admin', ${user.avatarKey}, ${user.color}, ${now()})
     `.run()
-    await sql(
-      c.env.DB,
-    )`update invite set used_by = ${user.id} where token_hash = ${tokenHash}`.run()
+    await markInviteUsedBy(c.env.DB, tokenHash, user.id)
     return c.json(await signIn(c, user), 201)
   })
 

@@ -8,4 +8,6 @@ export interface Bindings {
   TOTP_SECRET: string
   OWNER_NAME?: string
   WEB_ANALYTICS_TOKEN?: string
+  DISCORD_CLIENT_ID?: string
+  DISCORD_CLIENT_SECRET?: string
 }

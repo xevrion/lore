@@ -3,6 +3,7 @@ import {HTTPException} from "hono/http-exception"
 import {app, type Context} from "./lib/app"
 import admin from "./routes/admin"
 import auth from "./routes/auth"
+import discord from "./routes/discord"
 import files from "./routes/files"
 import memes from "./routes/memes"
 import page from "./routes/page"
@@ -33,7 +34,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   "permissions-policy": "camera=(), microphone=(), geolocation=()",
 }
 
-const GUESSABLE = /^\/api\/auth\/(login|join|invite)/
+const GUESSABLE = /^\/api\/auth\/(login|join|invite|discord)/
 
 async function rateLimit(c: Context, next: () => Promise<void>) {
   // Code and invite guessing is throttled globally: there is one account to
@@ -83,6 +84,7 @@ export default app()
   })
   .use("/api/*", rateLimit)
   .route("/api", auth)
+  .route("/api", discord)
   .route("/api", memes)
   .route("/api", admin)
   .route("/api", users)

@@ -2,11 +2,11 @@ import {HTTPException} from "hono/http-exception"
 import {z} from "zod"
 
 import {requireAdmin} from "../auth"
-import {app, origin} from "../lib/app"
+import {app} from "../lib/app"
 import {storeAvatar} from "../lib/avatar"
-import {toUser} from "../lib/meme"
 import {sql} from "../lib/sql"
-import {LIMITS, type Me} from "../lib/types"
+import {LIMITS} from "../lib/types"
+import {me} from "./auth"
 
 const nameSchema = z.string().trim().min(1, "Pick a name").max(LIMITS.nameChars)
 
@@ -31,6 +31,5 @@ export default app().patch("/users/me", async (c) => {
   await sql(c.env.DB)`
     update user set name = ${name}, avatar_key = ${avatarKey} where id = ${user.id}
   `.run()
-  const me: Me = {...toUser(origin(c), {...user, name, avatarKey}), role: user.role}
-  return c.json(me)
+  return c.json(me(c, {...user, name, avatarKey}))
 })

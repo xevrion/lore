@@ -18,6 +18,8 @@ export default defineConfig(async () => {
           bindings: {
             TEST_MIGRATIONS: migrations,
             TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+            DISCORD_CLIENT_ID: "test-client",
+            DISCORD_CLIENT_SECRET: "test-secret",
           },
           // The real login limit is 10 a minute, which the suite would exhaust.
           ratelimits: {
