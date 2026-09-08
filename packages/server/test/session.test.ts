@@ -11,7 +11,7 @@ import {
   SESSION_TTL_MS,
 } from "../src/auth"
 import {sql} from "../src/lib/sql"
-import {loginAsOwner, ORIGIN} from "./helpers"
+import {loginAsOwner, ORIGIN, totpCode} from "./helpers"
 
 const insertUser = (id: string, role: "owner" | "admin" = "admin") =>
   sql(env.DB)`
@@ -115,5 +115,27 @@ describe("login", () => {
     expect(cookie).toContain("SameSite=Lax")
     expect(cookie).toContain("Path=/")
     expect(cookie).toContain("Max-Age=2592000")
+  })
+})
+
+describe("login lockout", () => {
+  it("locks after repeated wrong codes and accepts the right one once cleared", async () => {
+    await sql(
+      env.DB,
+    )`update login_lock set failures = 0, locked_until = null where id = 1`.run()
+    const attempt = (totp: string) =>
+      SELF.fetch(`${ORIGIN}/api/auth/login`, {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify({totp}),
+      })
+    for (let i = 0; i < 3; i++) expect((await attempt("000000")).status).toBe(400)
+    const locked = await attempt(await totpCode())
+    expect(locked.status).toBe(429)
+    expect(((await locked.json()) as {error: string}).error).toMatch(/Try again in 1 minute/)
+    await sql(
+      env.DB,
+    )`update login_lock set failures = 0, locked_until = null where id = 1`.run()
+    expect((await attempt(await totpCode())).status).toBe(200)
   })
 })

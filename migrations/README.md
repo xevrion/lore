@@ -8,6 +8,7 @@ after it has been applied anywhere; add a new one instead.
 | --- | --- |
 | `0001_init.sql` | Users, sessions, invites and memes. |
 | `0002_discord.sql` | Optional Discord account link on users. |
+| `0003_login_lock.sql` | Single row tracking failed owner logins for the lockout. |
 
 To add one: create `NNNN_short_name.sql` with the next number, add a row to this
 table (CI fails if you forget), then run `pnpm migrate` locally.

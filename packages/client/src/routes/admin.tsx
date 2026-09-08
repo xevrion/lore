@@ -143,7 +143,7 @@ function Overview() {
           {s.topMemes.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing copied yet.</p>
           ) : (
-            <ol className="grid grid-cols-5 gap-2">
+            <ol className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {s.topMemes.map((m: Meme) => (
                 <li
                   key={m.id}
@@ -241,7 +241,10 @@ function Invites() {
       ) : (
         <ul className="divide-y rounded-lg border">
           {invites.data.map((inv) => (
-            <li key={inv.tokenHash} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <li
+              key={inv.tokenHash}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm"
+            >
               <span className="font-mono text-xs text-muted-foreground">
                 {inv.tokenHash.slice(0, 8)}
               </span>
@@ -331,11 +334,11 @@ function Admins({ownerId}: {ownerId: string}) {
             <li
               key={u.id}
               className={cn(
-                "grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm sm:grid-cols-[auto_1fr_5rem_7rem_7rem_auto]",
+                "grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-sm sm:grid-cols-[auto_1fr_5rem_7rem_7rem_auto]",
                 u.revokedAt && "opacity-50",
               )}
             >
-              <UserAvatar user={u} size="md" />
+              <UserAvatar user={u} size="md" className="row-span-2 sm:row-span-1" />
               <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate font-medium">{u.name}</span>
                 <Badge
@@ -347,6 +350,11 @@ function Admins({ownerId}: {ownerId: string}) {
                 {u.discordLinked && <Badge variant="outline">Discord</Badge>}
                 {u.revokedAt && <Badge variant="outline">revoked</Badge>}
               </div>
+              <span className="col-start-2 truncate text-xs text-muted-foreground sm:hidden">
+                {u.uploadCount} {u.uploadCount === 1 ? "upload" : "uploads"}, joined{" "}
+                {formatDate(u.createdAt)},{" "}
+                {u.lastSeenAt ? `seen ${formatRelative(u.lastSeenAt)}` : "never seen"}
+              </span>
               <span className="hidden text-muted-foreground tabular-nums sm:block">
                 {u.uploadCount} {u.uploadCount === 1 ? "upload" : "uploads"}
               </span>
@@ -356,7 +364,7 @@ function Admins({ownerId}: {ownerId: string}) {
               <span className="hidden text-muted-foreground sm:block">
                 {u.lastSeenAt ? `seen ${formatRelative(u.lastSeenAt)}` : "never seen"}
               </span>
-              <div className="justify-self-end">
+              <div className="col-start-3 row-start-1 justify-self-end sm:col-auto sm:row-auto">
                 {u.id !== ownerId && !u.revokedAt && (
                   <Button variant="ghost" size="sm" onClick={() => setRevoking(u)}>
                     Revoke

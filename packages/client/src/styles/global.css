@@ -168,11 +168,12 @@
 
 /* Masonry columns. Cards get break-inside: avoid so nothing splits. */
 .masonry {
-  column-gap: 0.75rem;
+  column-gap: 0.5rem;
   columns: 2;
 }
 @media (min-width: 40rem) {
   .masonry {
+    column-gap: 0.75rem;
     columns: 3;
   }
 }

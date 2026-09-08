@@ -40,18 +40,66 @@ export async function signIn(c: Context, user: SessionUser) {
 
 const nameSchema = z.string().trim().min(1, "Pick a name").max(LIMITS.nameChars)
 
+// A six digit code is guessable given enough tries, and the rate limiter alone
+// still allows thousands of attempts a day. After three misses the lockout
+// doubles each time, from a minute up to a day, and is global on purpose so
+// rotating IPs does not help.
+const LOCK_AFTER = 3
+const LOCK_CAP_MINUTES = 24 * 60
+
+interface LockRow {
+  failures: number
+  locked_until: string | null
+}
+
+async function assertNotLocked(c: Context) {
+  const lock = await sql(
+    c.env.DB,
+  )`select failures, locked_until from login_lock where id = 1`.first<LockRow>()
+  const until = lock?.locked_until ? new Date(lock.locked_until).getTime() : 0
+  if (until > Date.now()) {
+    const minutes = Math.max(1, Math.ceil((until - Date.now()) / 60_000))
+    throw new HTTPException(429, {
+      message: `Too many wrong codes. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+    })
+  }
+}
+
+async function recordFailure(c: Context) {
+  const lock = await sql(
+    c.env.DB,
+  )`select failures, locked_until from login_lock where id = 1`.first<LockRow>()
+  const failures = (lock?.failures ?? 0) + 1
+  const lockedUntil =
+    failures >= LOCK_AFTER
+      ? new Date(
+          Date.now() + Math.min(2 ** (failures - LOCK_AFTER), LOCK_CAP_MINUTES) * 60_000,
+        ).toISOString()
+      : null
+  await sql(c.env.DB)`
+    update login_lock set failures = ${failures}, locked_until = ${lockedUntil} where id = 1
+  `.run()
+}
+
 export default app()
   .post(
     "/auth/login",
     validate("json", z.object({totp: z.string().regex(/^\d{6}$/)})),
     async (c) => {
       const {totp} = c.req.valid("json")
+      await assertNotLocked(c)
       const result = await new TOTP({
         secret: c.env.TOTP_SECRET,
         crypto: otpCrypto,
         base32,
       }).verify(totp, {epochTolerance: 30})
-      if (!result.valid) throw new HTTPException(400, {message: "Wrong code"})
+      if (!result.valid) {
+        await recordFailure(c)
+        throw new HTTPException(400, {message: "Wrong code"})
+      }
+      await sql(
+        c.env.DB,
+      )`update login_lock set failures = 0, locked_until = null where id = 1`.run()
       // The owner row is created on first login so setup needs nothing but the secret.
       await sql(c.env.DB)`
       insert into user (id, name, role, color, created_at)

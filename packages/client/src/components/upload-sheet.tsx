@@ -79,7 +79,7 @@ export default function UploadSheet() {
           )}
         </div>
 
-        <SheetFooter className="flex-row items-center justify-between border-t">
+        <SheetFooter className="flex-row items-center justify-between border-t pb-[max(1rem,env(safe-area-inset-bottom))]">
           <input
             ref={fileInput}
             type="file"

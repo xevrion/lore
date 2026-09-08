@@ -98,7 +98,7 @@ export function MemeCard({
   return (
     <article
       className={cn(
-        "group relative mb-3 animate-rise break-inside-avoid overflow-hidden rounded-lg bg-card",
+        "group relative mb-2 animate-rise break-inside-avoid overflow-hidden rounded-lg bg-card sm:mb-3",
         "ring-1 ring-transparent transition-[box-shadow] duration-200 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
         "[@media(hover:hover)]:hover:ring-foreground/15",
         menuOpen && "is-open ring-foreground/15",
@@ -218,7 +218,7 @@ function IconButton({
         e.stopPropagation()
         onClick?.()
       }}
-      className="rounded-md p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+      className="inline-flex size-8 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
       {...rest}
     >
       {children}

@@ -24,6 +24,7 @@ export default function Login() {
   const queryClient = useQueryClient()
   const [code, setCode] = useState("")
   const [state, setState] = useState<"idle" | "busy" | "wrong" | "ok">("idle")
+  const [problem, setProblem] = useState("Wrong code")
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -47,9 +48,8 @@ export default function Login() {
     } catch (e) {
       setState("wrong")
       setCode("")
-      if (!(e instanceof ApiError && e.status === 400)) {
-        console.error(e)
-      }
+      setProblem(e instanceof ApiError && e.status !== 400 ? e.message : "Wrong code")
+      if (!(e instanceof ApiError)) console.error(e)
     }
   }
 
@@ -96,7 +96,7 @@ export default function Login() {
               state === "wrong" ? "text-destructive" : "text-muted-foreground",
             )}
           >
-            {state === "wrong" ? "Wrong code" : "Enter the code from your authenticator app"}
+            {state === "wrong" ? problem : "Enter the code from your authenticator app"}
           </p>
         </div>
         {config?.discord && (

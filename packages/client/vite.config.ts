@@ -13,7 +13,8 @@ export default defineConfig({
     alias: {"@": fileURLToPath(new URL("./src", import.meta.url))},
   },
   server: {
-    proxy: Object.fromEntries(["/api", "/i", "/t", "/a", "/m"].map((p) => [p, worker])),
+    // Anchored so `/a/` does not also capture `/admin`.
+    proxy: Object.fromEntries(["api", "i", "t", "a", "m"].map((p) => [`^/${p}/`, worker])),
   },
   build: {
     target: "es2022",

@@ -70,7 +70,7 @@ export default function Gallery() {
         onSort={setSort}
         onUpload={canUpload ? () => setOpen(true) : undefined}
       />
-      <main className="mx-auto max-w-[1800px] px-4 py-4 sm:px-6">
+      <main className="mx-auto max-w-[1800px] px-3 py-3 sm:px-6 sm:py-4">
         <MemeGrid
           sort={sort}
           q={debounced}
