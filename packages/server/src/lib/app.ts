@@ -1,15 +1,19 @@
 import {Hono, type Context as HonoContext} from "hono"
 
 import type {Bindings} from "../env"
+import type {Role} from "./types"
 
 export interface SessionUser {
   id: string
   name: string
-  role: "owner" | "admin"
+  role: Role
   color: string
   avatarKey: string | null
   discordId: string | null
+  trusted: boolean
 }
+
+export const isStaff = (user: SessionUser) => user.role !== "member"
 
 export type AppEnv = {
   Bindings: Bindings
@@ -33,6 +37,16 @@ export function origin(c: Context) {
 // Discord sign-in is on only when both halves of the OAuth app are configured.
 export const discordEnabled = (env: Bindings) =>
   Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET)
+
+// Members exist only when a Discord server is named; otherwise the instance
+// stays invite-only.
+export const membersEnabled = (env: Bindings) =>
+  discordEnabled(env) && Boolean(env.DISCORD_GUILD_ID)
+
+export const memberQuotaBytes = (env: Bindings) =>
+  Number(env.MEMBER_QUOTA_BYTES) || 200 * 1024 * 1024
+
+export const memberDailyUploads = (env: Bindings) => Number(env.MEMBER_DAILY_UPLOADS) || 20
 
 // R2 bills past 10 GB, so uploads stop well before that. Overridable per instance.
 export const storageCap = (env: Bindings) =>

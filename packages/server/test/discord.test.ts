@@ -33,12 +33,15 @@ async function start(query = "", cookie = "") {
 // The worker and this test share an isolate, so swapping the fetch used for
 // Discord calls is enough to fake the whole OAuth exchange.
 const calls: string[] = []
-function mockDiscord(user: {
-  id: string
-  username: string
-  global_name?: string
-  avatar?: string
-}) {
+function mockDiscord(
+  user: {
+    id: string
+    username: string
+    global_name?: string
+    avatar?: string
+  },
+  guilds: string[] = [],
+) {
   discordHttp.fetch = async (input, init) => {
     calls.push(`${init?.method ?? "GET"} ${input}`)
     if (input === "https://discord.com/api/oauth2/token") {
@@ -51,6 +54,9 @@ function mockDiscord(user: {
     if (input === "https://discord.com/api/users/@me") {
       expect(new Headers(init?.headers).get("authorization")).toBe("Bearer tok")
       return Response.json({global_name: null, avatar: null, ...user})
+    }
+    if (input === "https://discord.com/api/users/@me/guilds") {
+      return Response.json(guilds.map((id) => ({id})))
     }
     throw new Error(`unexpected fetch ${input}`)
   }
@@ -83,7 +89,7 @@ describe("discord login", () => {
 
   it("reports whether it is configured", async () => {
     const res = await SELF.fetch(`${ORIGIN}/api/auth/config`)
-    expect((await res.json()) as AuthConfig).toEqual({discord: true})
+    expect((await res.json()) as AuthConfig).toEqual({discord: true, members: true})
 
     const off = await app.request(
       `${ORIGIN}/api/auth/config`,
@@ -91,7 +97,7 @@ describe("discord login", () => {
       {...env, DISCORD_CLIENT_ID: ""},
       createExecutionContext(),
     )
-    expect((await off.json()) as AuthConfig).toEqual({discord: false})
+    expect((await off.json()) as AuthConfig).toEqual({discord: false, members: false})
   })
 
   it("sends the browser to Discord with a state cookie", async () => {
@@ -99,7 +105,7 @@ describe("discord login", () => {
     expect(oauthCookie).toMatch(/^lore_oauth=/)
     expect(location.origin + location.pathname).toBe("https://discord.com/oauth2/authorize")
     expect(location.searchParams.get("client_id")).toBe("test-client")
-    expect(location.searchParams.get("scope")).toBe("identify")
+    expect(location.searchParams.get("scope")).toBe("identify guilds")
     expect(location.searchParams.get("redirect_uri")).toBe(
       `${ORIGIN}/api/auth/discord/callback`,
     )

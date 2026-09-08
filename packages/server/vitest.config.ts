@@ -20,6 +20,9 @@ export default defineConfig(async () => {
             TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
             DISCORD_CLIENT_ID: "test-client",
             DISCORD_CLIENT_SECRET: "test-secret",
+            DISCORD_GUILD_ID: "guild-1",
+            MEMBER_QUOTA_BYTES: "4096",
+            MEMBER_DAILY_UPLOADS: "3",
           },
           // The real login limit is 10 a minute, which the suite would exhaust.
           ratelimits: {

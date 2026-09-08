@@ -103,8 +103,12 @@ interface FileRow {
   mime: string
 }
 
+// Pending and hidden memes 404 like deleted ones, so nothing under review or
+// pulled by reports can be embedded anywhere.
 const findFile = (c: Context, id: string) =>
-  sql(c.env.DB)`select key, thumb_key, ext, mime from meme where id = ${id}`.first<FileRow>()
+  sql(c.env.DB)`
+    select key, thumb_key, ext, mime from meme where id = ${id} and status = 'live'
+  `.first<FileRow>()
 
 export default app()
   .on(["GET", "HEAD"], "/i/:file", (c) => {

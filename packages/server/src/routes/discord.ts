@@ -1,7 +1,15 @@
 import {deleteCookie, getCookie, setCookie} from "hono/cookie"
 
 import {getSession, hashToken, newToken} from "../auth"
-import {app, discordEnabled, now, origin, type Context, type SessionUser} from "../lib/app"
+import {
+  app,
+  discordEnabled,
+  membersEnabled,
+  now,
+  origin,
+  type Context,
+  type SessionUser,
+} from "../lib/app"
 import {storeAvatar} from "../lib/avatar"
 import {pickColor} from "../lib/colors"
 import {newId} from "../lib/id"
@@ -38,11 +46,12 @@ interface DiscordUser {
 interface UserRow {
   id: string
   name: string
-  role: "owner" | "admin"
+  role: "owner" | "admin" | "member"
   color: string
   avatar_key: string | null
   discord_id: string | null
   revoked_at: string | null
+  trusted: number
 }
 
 const toSessionUser = (row: UserRow): SessionUser => ({
@@ -52,10 +61,15 @@ const toSessionUser = (row: UserRow): SessionUser => ({
   color: row.color,
   avatarKey: row.avatar_key,
   discordId: row.discord_id,
+  trusted: row.trusted === 1,
 })
 
-// The token never touches storage. It is used for exactly one profile read.
-async function fetchDiscordUser(c: Context, code: string): Promise<DiscordUser | null> {
+// The token never touches storage. It is used for one profile read and, when
+// members are enabled, one look at the guild list.
+async function fetchDiscordUser(
+  c: Context,
+  code: string,
+): Promise<{user: DiscordUser; token: string} | null> {
   const token = await discordHttp.fetch("https://discord.com/api/oauth2/token", {
     method: "POST",
     headers: {"content-type": "application/x-www-form-urlencoded"},
@@ -77,11 +91,23 @@ async function fetchDiscordUser(c: Context, code: string): Promise<DiscordUser |
   const user = (await profile.json()) as Partial<DiscordUser>
   if (typeof user.id !== "string" || typeof user.username !== "string") return null
   return {
-    id: user.id,
-    username: user.username,
-    global_name: user.global_name ?? null,
-    avatar: user.avatar ?? null,
+    user: {
+      id: user.id,
+      username: user.username,
+      global_name: user.global_name ?? null,
+      avatar: user.avatar ?? null,
+    },
+    token: access_token,
   }
+}
+
+async function inGuild(c: Context, token: string) {
+  const res = await discordHttp.fetch("https://discord.com/api/users/@me/guilds", {
+    headers: {authorization: `Bearer ${token}`},
+  })
+  if (!res.ok) return false
+  const guilds = (await res.json()) as {id?: string}[]
+  return guilds.some((g) => g.id === c.env.DISCORD_GUILD_ID)
 }
 
 // Best effort: a friend without a Discord avatar, or a CDN hiccup, still gets in.
@@ -113,7 +139,7 @@ const readState = (c: Context): OAuthState | null => {
 
 export default app()
   .get("/auth/config", (c) => {
-    const config: AuthConfig = {discord: enabled(c)}
+    const config: AuthConfig = {discord: enabled(c), members: membersEnabled(c.env)}
     return c.json(config)
   })
 
@@ -133,7 +159,7 @@ export default app()
     const params = new URLSearchParams({
       client_id: c.env.DISCORD_CLIENT_ID ?? "",
       response_type: "code",
-      scope: "identify",
+      scope: membersEnabled(c.env) ? "identify guilds" : "identify",
       redirect_uri: redirectUri(c),
       state: state.state,
       prompt: "none",
@@ -147,11 +173,12 @@ export default app()
     if (!enabled(c) || !saved || !code || c.req.query("state") !== saved.state) {
       return c.redirect("/login?error=oauth")
     }
-    const discord = await fetchDiscordUser(c, code)
-    if (!discord) return c.redirect("/login?error=oauth")
+    const fetched = await fetchDiscordUser(c, code)
+    if (!fetched) return c.redirect("/login?error=oauth")
+    const discord = fetched.user
 
     const existing = await sql(c.env.DB)`
-      select id, name, role, color, avatar_key, discord_id, revoked_at
+      select id, name, role, color, avatar_key, discord_id, revoked_at, trusted
       from user where discord_id = ${discord.id}
     `.first<UserRow>()
 
@@ -173,28 +200,33 @@ export default app()
       return c.redirect("/")
     }
 
-    if (!saved.invite) return c.redirect("/login?error=not-invited")
-    const tokenHash = await hashToken(saved.invite)
-    const invite = await findInvite(c.env.DB, tokenHash)
-    const usable =
-      invite && !invite.used_at && new Date(invite.expires_at).getTime() > Date.now()
-    if (!usable) return c.redirect("/login?error=not-invited")
-    await consumeInvite(c.env.DB, tokenHash)
+    // An invite makes an admin. Without one, being in the Discord server makes a
+    // member, who starts untrusted and goes through the review queue.
+    const tokenHash = saved.invite ? await hashToken(saved.invite) : null
+    const invite = tokenHash ? await findInvite(c.env.DB, tokenHash) : null
+    const invited =
+      invite !== null && !invite.used_at && new Date(invite.expires_at).getTime() > Date.now()
+    if (!invited && !(membersEnabled(c.env) && (await inGuild(c, fetched.token)))) {
+      return c.redirect("/login?error=not-invited")
+    }
+    if (invited && tokenHash) await consumeInvite(c.env.DB, tokenHash)
 
     const user: SessionUser = {
       id: newId(10),
       name: (discord.global_name || discord.username).trim().slice(0, LIMITS.nameChars),
-      role: "admin",
+      role: invited ? "admin" : "member",
       color: pickColor(),
       avatarKey: null,
       discordId: discord.id,
+      trusted: invited,
     }
     user.avatarKey = await copyAvatar(c, user.id, discord)
     await sql(c.env.DB)`
-      insert into user (id, name, role, avatar_key, color, created_at, discord_id)
-      values (${user.id}, ${user.name}, 'admin', ${user.avatarKey}, ${user.color}, ${now()}, ${user.discordId})
+      insert into user (id, name, role, avatar_key, color, created_at, discord_id, trusted)
+      values (${user.id}, ${user.name}, ${user.role}, ${user.avatarKey}, ${user.color}, ${now()},
+        ${user.discordId}, ${invited ? 1 : 0})
     `.run()
-    await markInviteUsedBy(c.env.DB, tokenHash, user.id)
+    if (invited && tokenHash) await markInviteUsedBy(c.env.DB, tokenHash, user.id)
     await signIn(c, user)
     return c.redirect("/")
   })

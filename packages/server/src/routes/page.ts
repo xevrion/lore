@@ -6,7 +6,7 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCode
 // Some platforms prefer a page with Open Graph tags over a raw image URL. The
 // copy button still hands out the direct file URL; this page exists for the rest.
 export default app().get("/m/:id", async (c) => {
-  const row = await c.env.DB.prepare(`${MEME_SELECT} where m.id = ?`)
+  const row = await c.env.DB.prepare(`${MEME_SELECT} where m.id = ? and m.status = 'live'`)
     .bind(c.req.param("id"))
     .first<MemeRow>()
   if (!row) return c.text("Not found", 404)

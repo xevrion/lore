@@ -5,7 +5,7 @@ import {createContext, useContext, useMemo, useSyncExternalStore} from "react"
 import type {ReactNode} from "react"
 import {toast} from "sonner"
 
-import {api, memesQueryKey} from "@/api"
+import {api, memesQueryKey, meQueryKey} from "@/api"
 import {prepareImage, type Prepared} from "@/lib/image"
 import {uploadMeme} from "@/lib/upload"
 
@@ -152,6 +152,8 @@ class UploadStore {
         .then((meme) => {
           this.patch(next.id, {status: "done", progress: 1})
           this.prepend(meme)
+          // Quota numbers live on /auth/me.
+          void this.queryClient.invalidateQueries({queryKey: meQueryKey})
         })
         .catch((e: unknown) => {
           this.patch(next.id, {

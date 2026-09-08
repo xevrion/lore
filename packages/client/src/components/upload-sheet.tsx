@@ -2,6 +2,7 @@ import {LIMITS} from "@lore/server/types"
 import {AlertTriangle, RotateCcw, X} from "lucide-react"
 import {useEffect, useRef} from "react"
 
+import {useMe} from "@/api"
 import {TagInput} from "@/components/tag-input"
 import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
@@ -22,6 +23,8 @@ export default function UploadSheet() {
   const {items, open, setOpen, add, remove, update, retry, start, clearFinished, busy} =
     useUploads()
   const fileInput = useRef<HTMLInputElement>(null)
+  const {data: me} = useMe()
+  const quota = me?.quota ?? null
 
   const ready = items.filter((i) => i.status === "ready").length
   const failed = items.filter((i) => i.status === "error").length
@@ -51,6 +54,13 @@ export default function UploadSheet() {
           <SheetTitle>Upload</SheetTitle>
           <SheetDescription>
             PNG, JPG, GIF or WebP up to 10 MB. GIFs under 8 MB preview reliably in Discord.
+            {quota && (
+              <>
+                {" "}
+                You have used {formatBytes(quota.bytesUsed)} of {formatBytes(quota.bytesLimit)},{" "}
+                {quota.uploadsToday} of {quota.uploadsLimit} uploads today.
+              </>
+            )}
           </SheetDescription>
         </SheetHeader>
 

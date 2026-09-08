@@ -1,7 +1,11 @@
 // JSON shapes shared with the client. The client imports this file as
 // `@lore/server/types`, so anything exported here is part of the API contract.
 
-export type Role = "owner" | "admin"
+export type Role = "owner" | "admin" | "member"
+
+// Live memes are public. Pending ones wait for a staff approval, hidden ones
+// were pulled by reports and wait for a staff decision.
+export type MemeStatus = "live" | "pending" | "hidden"
 
 export type Ext = "png" | "jpg" | "gif" | "webp"
 
@@ -12,9 +16,18 @@ export interface UserSummary {
   avatarUrl: string | null
 }
 
+export interface Quota {
+  bytesUsed: number
+  bytesLimit: number
+  uploadsToday: number
+  uploadsLimit: number
+}
+
 export interface Me extends UserSummary {
   role: Role
   discordLinked: boolean
+  // Null for staff, who have no quota.
+  quota: Quota | null
 }
 
 export interface Meme {
@@ -31,6 +44,8 @@ export interface Meme {
   createdAt: string
   copies: number
   views: number
+  status: MemeStatus
+  reports: number
   uploader: UserSummary
 }
 
@@ -48,10 +63,16 @@ export interface AdminUser extends UserSummary {
   revokedAt: string | null
   lastSeenAt: string | null
   discordLinked: boolean
+  trusted: boolean
+  bannedAt: string | null
+  bytesUsed: number
+  pendingCount: number
 }
 
 export interface AuthConfig {
   discord: boolean
+  // True when members of the configured Discord server can sign in without an invite.
+  members: boolean
 }
 
 export interface PendingInvite {
@@ -72,6 +93,8 @@ export interface AdminStats {
   copiesTotal: number
   viewsTotal: number
   uploadsLast7d: number
+  pendingCount: number
+  hiddenCount: number
   topMemes: Meme[]
   topUploaders: {user: UserSummary; count: number}[]
 }
@@ -89,4 +112,7 @@ export const LIMITS = {
   titleChars: 120,
   tagCount: 10,
   tagChars: 32,
+  memberGifBytes: 5 * 1024 * 1024,
+  trustAfterApprovals: 10,
+  hideAfterReports: 2,
 } as const

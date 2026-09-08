@@ -1,5 +1,5 @@
 import {splitTags} from "./search"
-import type {Ext, Meme, UserSummary} from "./types"
+import type {Ext, Meme, MemeStatus, UserSummary} from "./types"
 
 export interface MemeRow {
   id: string
@@ -10,12 +10,15 @@ export interface MemeRow {
   width: number
   height: number
   size: number
+  thumb_size: number
   title: string
   tags: string
   uploader_id: string
   created_at: string
   copies: number
   views: number
+  status: MemeStatus
+  reports: number
   uploader_name: string
   uploader_color: string
   uploader_avatar_key: string | null
@@ -61,6 +64,8 @@ export function toMeme(origin: string, row: MemeRow): Meme {
     createdAt: row.created_at,
     copies: row.copies,
     views: row.views,
+    status: row.status,
+    reports: row.reports,
     uploader: toUser(origin, {
       id: row.uploader_id,
       name: row.uploader_name,

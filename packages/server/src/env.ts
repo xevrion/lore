@@ -11,4 +11,7 @@ export interface Bindings {
   STORAGE_CAP_BYTES?: string
   DISCORD_CLIENT_ID?: string
   DISCORD_CLIENT_SECRET?: string
+  DISCORD_GUILD_ID?: string
+  MEMBER_QUOTA_BYTES?: string
+  MEMBER_DAILY_UPLOADS?: string
 }

@@ -1,6 +1,6 @@
 import type {Sort} from "@lore/server/types"
 import {useQueryClient} from "@tanstack/react-query"
-import {LogOut, Moon, Search, Settings, Shield, Sun, Upload, X} from "lucide-react"
+import {Flag, LogOut, Moon, Search, Settings, Shield, Sun, Upload, X} from "lucide-react"
 import {useEffect, useRef} from "react"
 import {Link, useNavigate} from "react-router"
 import {toast} from "sonner"
@@ -192,11 +192,17 @@ function UserMenu() {
           <Settings aria-hidden />
           Settings
         </DropdownMenuItem>
-        {me.role === "owner" && (
-          <DropdownMenuItem onSelect={() => void navigate("/admin")}>
-            <Shield aria-hidden />
-            Admin
-          </DropdownMenuItem>
+        {me.role !== "member" && (
+          <>
+            <DropdownMenuItem onSelect={() => void navigate("/admin")}>
+              <Shield aria-hidden />
+              Admin
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void navigate("/admin/review")}>
+              <Flag aria-hidden />
+              Review
+            </DropdownMenuItem>
+          </>
         )}
         <DropdownMenuItem onSelect={toggle}>
           {theme === "dark" ? <Sun aria-hidden /> : <Moon aria-hidden />}

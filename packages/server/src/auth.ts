@@ -42,10 +42,11 @@ interface SessionRow {
   expires_at: string
   id: string
   name: string
-  role: "owner" | "admin"
+  role: "owner" | "admin" | "member"
   color: string
   avatar_key: string | null
   discord_id: string | null
+  trusted: number
 }
 
 export interface Session {
@@ -59,7 +60,8 @@ export interface Session {
 export async function lookupSession(db: D1Database, token: string): Promise<Session | null> {
   const tokenHash = await hashToken(token)
   const row = await sql(db)`
-    select s.token_hash, s.expires_at, u.id, u.name, u.role, u.color, u.avatar_key, u.discord_id
+    select s.token_hash, s.expires_at, u.id, u.name, u.role, u.color, u.avatar_key, u.discord_id,
+      u.trusted
     from session s join user u on u.id = s.user_id
     where s.token_hash = ${tokenHash} and u.revoked_at is null
   `.first<SessionRow>()
@@ -77,6 +79,7 @@ export async function lookupSession(db: D1Database, token: string): Promise<Sess
       color: row.color,
       avatarKey: row.avatar_key,
       discordId: row.discord_id,
+      trusted: row.trusted === 1,
     },
     expiresAt: row.expires_at,
     refresh: expires - Date.now() < SESSION_TTL_MS - REFRESH_AFTER_MS,
@@ -134,14 +137,20 @@ export async function getSession(c: Context): Promise<SessionUser | null> {
   return session.user
 }
 
-export async function requireAdmin(c: Context): Promise<SessionUser> {
+export async function requireUser(c: Context): Promise<SessionUser> {
   const user = await getSession(c)
   if (!user) throw new HTTPException(401, {message: "Sign in to do that"})
   return user
 }
 
+export async function requireStaff(c: Context): Promise<SessionUser> {
+  const user = await requireUser(c)
+  if (user.role === "member") throw new HTTPException(403, {message: "Admins only"})
+  return user
+}
+
 export async function requireOwner(c: Context): Promise<SessionUser> {
-  const user = await requireAdmin(c)
+  const user = await requireUser(c)
   if (user.role !== "owner") throw new HTTPException(403, {message: "Owner only"})
   return user
 }

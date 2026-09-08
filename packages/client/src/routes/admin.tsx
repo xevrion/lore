@@ -1,12 +1,13 @@
 import type {AdminUser, CreatedInvite, Meme} from "@lore/server/types"
+import {LIMITS} from "@lore/server/types"
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
-import {Check, Copy, ExternalLink} from "lucide-react"
+import {Check, Copy, ExternalLink, Flag} from "lucide-react"
 import {useEffect, useState} from "react"
 import type {ReactNode} from "react"
-import {useNavigate} from "react-router"
+import {Link, useNavigate} from "react-router"
 import {toast} from "sonner"
 
-import {api, useMe} from "@/api"
+import {api, isStaff, useMe} from "@/api"
 import {UserAvatar} from "@/components/added-by"
 import {Header} from "@/components/header"
 import {
@@ -20,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {Badge} from "@/components/ui/badge"
-import {Button} from "@/components/ui/button"
+import {Button, buttonVariants} from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -38,21 +39,51 @@ export default function Admin() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!isPending && me?.role !== "owner") void navigate("/", {replace: true})
+    if (!isPending && !isStaff(me)) void navigate("/", {replace: true})
   }, [isPending, me, navigate])
 
-  if (me?.role !== "owner") return null
+  if (!me || !isStaff(me)) return null
+  const owner = me.role === "owner"
 
   return (
     <>
       <Header />
       <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
         <h1 className="mb-8 text-xl font-semibold tracking-tight">Admin</h1>
+        <ReviewCard />
         <Overview />
-        <Invites />
-        <Admins ownerId={me.id} />
+        {owner && <Invites />}
+        <People ownerId={me.id} isOwner={owner} />
       </main>
     </>
+  )
+}
+
+// Just the count. The queue itself lives on its own page so a long backlog
+// never weighs this one down.
+function ReviewCard() {
+  const stats = useQuery({queryKey: ["admin", "stats"], queryFn: api.adminStats})
+  if (!stats.data) return null
+  const {pendingCount, hiddenCount} = stats.data
+  if (pendingCount === 0 && hiddenCount === 0) return null
+  return (
+    <div className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
+      <p className="inline-flex items-center gap-2">
+        <Flag className="size-4 text-amber-500" aria-hidden />
+        <span>
+          {pendingCount > 0 && (
+            <>
+              {pendingCount} {pendingCount === 1 ? "meme" : "memes"} waiting for review
+            </>
+          )}
+          {pendingCount > 0 && hiddenCount > 0 && ", "}
+          {hiddenCount > 0 && <>{hiddenCount} hidden by reports</>}
+        </span>
+      </p>
+      <Link to="/admin/review" className={buttonVariants({size: "sm", className: "pressable"})}>
+        Review
+      </Link>
+    </div>
   )
 }
 
@@ -307,74 +338,134 @@ function CopyField({value}: {value: string}) {
   )
 }
 
-function Admins({ownerId}: {ownerId: string}) {
+function People({ownerId, isOwner}: {ownerId: string; isOwner: boolean}) {
   const queryClient = useQueryClient()
   const users = useQuery({queryKey: ["admin", "users"], queryFn: api.adminUsers})
   const [revoking, setRevoking] = useState<AdminUser | null>(null)
+  const [banning, setBanning] = useState<AdminUser | null>(null)
+  const refresh = () => void queryClient.invalidateQueries({queryKey: ["admin"]})
 
   const revoke = useMutation({
     mutationFn: api.revokeUser,
     onSuccess: () => {
       toast("Revoked")
       setRevoking(null)
-      void queryClient.invalidateQueries({queryKey: ["admin"]})
+      refresh()
     },
     onError: (e) => toast.error(e.message),
   })
+  const ban = useMutation({
+    mutationFn: api.banUser,
+    onSuccess: ({deleted}) => {
+      toast(`Banned. ${deleted} ${deleted === 1 ? "meme" : "memes"} removed.`)
+      setBanning(null)
+      refresh()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const trust = useMutation({
+    mutationFn: ({id, trusted}: {id: string; trusted: boolean}) => api.trustUser(id, trusted),
+    onSuccess: refresh,
+    onError: (e) => toast.error(e.message),
+  })
+
+  if (users.isPending) {
+    return (
+      <Section title="Admins">
+        <Skeleton className="h-24 rounded-md" />
+      </Section>
+    )
+  }
+  if (users.isError) {
+    return (
+      <Section title="Admins">
+        <p className="text-sm text-destructive">{users.error.message}</p>
+      </Section>
+    )
+  }
+  const staff = users.data.filter((u) => u.role !== "member")
+  const members = users.data.filter((u) => u.role === "member")
+
+  const row = (u: AdminUser) => (
+    <li
+      key={u.id}
+      className={cn(
+        "grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-sm sm:grid-cols-[auto_1fr_7rem_7rem_auto]",
+        (u.revokedAt || u.bannedAt) && "opacity-50",
+      )}
+    >
+      <UserAvatar user={u} size="md" className="row-span-2 sm:row-span-1" />
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="truncate font-medium">{u.name}</span>
+        <Badge variant={u.role === "owner" ? "default" : "secondary"} className="capitalize">
+          {u.role}
+        </Badge>
+        {u.discordLinked && <Badge variant="outline">Discord</Badge>}
+        {u.role === "member" && !u.bannedAt && (
+          <Badge variant={u.trusted ? "outline" : "secondary"}>
+            {u.trusted ? "trusted" : "reviewed"}
+          </Badge>
+        )}
+        {u.bannedAt ? (
+          <Badge variant="destructive">banned</Badge>
+        ) : (
+          u.revokedAt && <Badge variant="outline">revoked</Badge>
+        )}
+      </div>
+      <span className="col-start-2 truncate text-xs text-muted-foreground sm:hidden">
+        {u.uploadCount} {u.uploadCount === 1 ? "upload" : "uploads"}
+        {u.role === "member" && `, ${formatBytes(u.bytesUsed)}`}
+        {u.pendingCount > 0 && `, ${u.pendingCount} pending`}, joined {formatDate(u.createdAt)}
+      </span>
+      <span className="hidden text-muted-foreground tabular-nums sm:block">
+        {u.uploadCount} {u.uploadCount === 1 ? "upload" : "uploads"}
+        {u.pendingCount > 0 && (
+          <span className="text-amber-500"> ({u.pendingCount} pending)</span>
+        )}
+      </span>
+      <span className="hidden text-muted-foreground sm:block" title={u.createdAt}>
+        {u.role === "member" ? formatBytes(u.bytesUsed) : `joined ${formatDate(u.createdAt)}`}
+      </span>
+      <div className="col-start-3 row-start-1 flex gap-1 justify-self-end sm:col-auto sm:row-auto">
+        {u.role === "member" && !u.bannedAt && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={trust.isPending}
+            onClick={() => trust.mutate({id: u.id, trusted: !u.trusted})}
+          >
+            {u.trusted ? "Review again" : "Trust"}
+          </Button>
+        )}
+        {u.id !== ownerId && !u.revokedAt && isOwner && (
+          <Button variant="ghost" size="sm" onClick={() => setRevoking(u)}>
+            Revoke
+          </Button>
+        )}
+        {u.id !== ownerId && !u.bannedAt && (isOwner || u.role === "member") && (
+          <Button variant="ghost" size="sm" onClick={() => setBanning(u)}>
+            Ban
+          </Button>
+        )}
+      </div>
+    </li>
+  )
 
   return (
-    <Section title="Admins" body="Everyone here can upload, edit and delete any meme.">
-      {users.isPending ? (
-        <Skeleton className="h-24 rounded-md" />
-      ) : users.isError ? (
-        <p className="text-sm text-destructive">{users.error.message}</p>
-      ) : (
-        <ul className="divide-y rounded-lg border">
-          {users.data.map((u) => (
-            <li
-              key={u.id}
-              className={cn(
-                "grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-sm sm:grid-cols-[auto_1fr_5rem_7rem_7rem_auto]",
-                u.revokedAt && "opacity-50",
-              )}
-            >
-              <UserAvatar user={u} size="md" className="row-span-2 sm:row-span-1" />
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-medium">{u.name}</span>
-                <Badge
-                  variant={u.role === "owner" ? "default" : "secondary"}
-                  className="capitalize"
-                >
-                  {u.role}
-                </Badge>
-                {u.discordLinked && <Badge variant="outline">Discord</Badge>}
-                {u.revokedAt && <Badge variant="outline">revoked</Badge>}
-              </div>
-              <span className="col-start-2 truncate text-xs text-muted-foreground sm:hidden">
-                {u.uploadCount} {u.uploadCount === 1 ? "upload" : "uploads"}, joined{" "}
-                {formatDate(u.createdAt)},{" "}
-                {u.lastSeenAt ? `seen ${formatRelative(u.lastSeenAt)}` : "never seen"}
-              </span>
-              <span className="hidden text-muted-foreground tabular-nums sm:block">
-                {u.uploadCount} {u.uploadCount === 1 ? "upload" : "uploads"}
-              </span>
-              <span className="hidden text-muted-foreground sm:block" title={u.createdAt}>
-                joined {formatDate(u.createdAt)}
-              </span>
-              <span className="hidden text-muted-foreground sm:block">
-                {u.lastSeenAt ? `seen ${formatRelative(u.lastSeenAt)}` : "never seen"}
-              </span>
-              <div className="col-start-3 row-start-1 justify-self-end sm:col-auto sm:row-auto">
-                {u.id !== ownerId && !u.revokedAt && (
-                  <Button variant="ghost" size="sm" onClick={() => setRevoking(u)}>
-                    Revoke
-                  </Button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+    <>
+      <Section title="Admins" body="Everyone here can upload, edit and delete any meme.">
+        <ul className="divide-y rounded-lg border">{staff.map(row)}</ul>
+      </Section>
+      <Section
+        title="Members"
+        body={`People from the Discord server. Their first ${LIMITS.trustAfterApprovals} approved uploads are reviewed, then they are trusted automatically.`}
+      >
+        {members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No members yet.</p>
+        ) : (
+          <ul className="divide-y rounded-lg border">{members.map(row)}</ul>
+        )}
+      </Section>
 
       <AlertDialog open={revoking !== null} onOpenChange={(open) => !open && setRevoking(null)}>
         <AlertDialogContent>
@@ -400,6 +491,32 @@ function Admins({ownerId}: {ownerId: string}) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Section>
+
+      <AlertDialog open={banning !== null} onOpenChange={(open) => !open && setBanning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ban {banning?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {banning?.uploadCount ?? 0} {banning?.uploadCount === 1 ? "meme" : "memes"} they
+              uploaded will be deleted and every pasted link to them stops working. They are
+              signed out and cannot come back. There is no undo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={ban.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                if (banning) ban.mutate(banning.id)
+              }}
+            >
+              Ban
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

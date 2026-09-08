@@ -14,6 +14,7 @@ import Gallery from "@/routes/gallery"
 const Login = lazy(() => import("@/routes/login"))
 const Join = lazy(() => import("@/routes/join"))
 const Admin = lazy(() => import("@/routes/admin"))
+const Review = lazy(() => import("@/routes/review"))
 const Settings = lazy(() => import("@/routes/settings"))
 const NotFound = lazy(() => import("@/routes/not-found"))
 
@@ -41,6 +42,7 @@ export function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/join/:token" element={<Join />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/admin/review" element={<Review />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

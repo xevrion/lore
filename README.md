@@ -46,6 +46,7 @@ server. Every file is checked by its magic bytes, not its extension.
 - Drag and drop, paste from the clipboard, or pick up to 30 files at once, three uploading in parallel with progress
 - Every meme shows who added it
 - Optional Discord sign-in: invites can then only be claimed with a Discord account, and friends can log in on any device without a fresh invite
+- Optional member mode: everyone in your Discord server can upload within a quota, new members' uploads are reviewed by an admin first, anyone can report a meme, and a ban erases everything a member posted
 - Any admin can edit titles and tags or delete anything
 - Owner dashboard: storage used, copy counts, top memes, top uploaders, pending invites, revoke with one click
 - Dark theme by default, light theme a toggle away

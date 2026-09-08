@@ -1,5 +1,5 @@
 import type {Meme} from "@lore/server/types"
-import {Check, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2} from "lucide-react"
+import {Check, Copy, ExternalLink, Flag, MoreHorizontal, Pencil, Trash2} from "lucide-react"
 import {useCallback, useEffect, useState} from "react"
 import type {ComponentProps, KeyboardEvent, MouseEvent, ReactNode} from "react"
 import {toast} from "sonner"
@@ -26,6 +26,7 @@ interface MemeCardProps {
   onCopied: (meme: Meme) => void
   onEdit: (meme: Meme) => void
   onDelete: (meme: Meme) => void
+  onReport: (meme: Meme) => void
 }
 
 export async function copyMemeLink(meme: Meme, onCopied: (meme: Meme) => void) {
@@ -47,11 +48,14 @@ export function MemeCard({
   onCopied,
   onEdit,
   onDelete,
+  onReport,
 }: MemeCardProps) {
   const [loaded, setLoaded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [copiedAt, setCopiedAt] = useState(0)
   const isGif = meme.ext === "gif"
+  // A pending or hidden meme 404s at its URL, so copying its link would only mislead.
+  const shareable = meme.status === "live"
 
   // A timer rather than animationend, which browsers hold back in hidden tabs.
   useEffect(() => {
@@ -71,6 +75,10 @@ export function MemeCard({
   }
 
   function copy() {
+    if (!shareable) {
+      toast("Waiting for an admin to approve this one.")
+      return
+    }
     void copyMemeLink(meme, (m) => {
       setCopiedAt(Date.now())
       onCopied(m)
@@ -111,8 +119,11 @@ export function MemeCard({
         onAuxClick={(e) => e.button === 1 && open()}
         onKeyDown={onKeyDown}
         aria-label={`Copy link to ${meme.title || "meme"}`}
-        title="Click to copy link"
-        className="pressable block w-full cursor-copy outline-none"
+        title={shareable ? "Click to copy link" : "Pending review"}
+        className={cn(
+          "pressable block w-full outline-none",
+          shareable ? "cursor-copy" : "cursor-default",
+        )}
         style={{aspectRatio: `${meme.width} / ${meme.height}`}}
       >
         <img
@@ -132,11 +143,18 @@ export function MemeCard({
         />
       </button>
 
-      {isGif && (
-        <span className="pointer-events-none absolute top-2 left-2 rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
-          GIF
-        </span>
-      )}
+      <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
+        {isGif && (
+          <span className="rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+            GIF
+          </span>
+        )}
+        {meme.status !== "live" && (
+          <span className="rounded-sm bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-black">
+            {meme.status === "pending" ? "Pending review" : "Hidden"}
+          </span>
+        )}
+      </div>
 
       {copiedAt > 0 && (
         <span
@@ -173,25 +191,31 @@ export function MemeCard({
             <IconButton label="Open image in new tab" onClick={open}>
               <ExternalLink className="size-3.5" />
             </IconButton>
-            {canEdit && (
-              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-                <DropdownMenuTrigger asChild>
-                  <IconButton label="More actions">
-                    <MoreHorizontal className="size-3.5" />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <IconButton label="More actions">
+                  <MoreHorizontal className="size-3.5" />
+                </IconButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                {canEdit && (
                   <DropdownMenuItem onSelect={() => onEdit(meme)}>
                     <Pencil aria-hidden />
                     Edit
                   </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => onReport(meme)}>
+                  <Flag aria-hidden />
+                  Report
+                </DropdownMenuItem>
+                {canEdit && (
                   <DropdownMenuItem variant="destructive" onSelect={() => onDelete(meme)}>
                     <Trash2 aria-hidden />
                     Delete
                   </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

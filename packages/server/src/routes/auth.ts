@@ -12,24 +12,34 @@ import {
   deleteUserSessions,
   getSession,
   hashToken,
-  requireAdmin,
+  requireUser,
   setSessionCookie,
   COOKIE,
 } from "../auth"
-import {app, discordEnabled, now, origin, type Context, type SessionUser} from "../lib/app"
+import {
+  app,
+  discordEnabled,
+  isStaff,
+  now,
+  origin,
+  type Context,
+  type SessionUser,
+} from "../lib/app"
 import {storeAvatar} from "../lib/avatar"
 import {pickColor} from "../lib/colors"
 import {newId} from "../lib/id"
 import {checkInvite, consumeInvite, findInvite, markInviteUsedBy} from "../lib/invite"
 import {toUser} from "../lib/meme"
+import {quotaFor} from "../lib/moderation"
 import {sql} from "../lib/sql"
 import {LIMITS, type Me} from "../lib/types"
 import {validate} from "../lib/validate"
 
-export const me = (c: Context, user: SessionUser): Me => ({
+export const me = async (c: Context, user: SessionUser): Promise<Me> => ({
   ...toUser(origin(c), user),
   role: user.role,
   discordLinked: user.discordId !== null,
+  quota: isStaff(user) ? null : await quotaFor(c, user.id),
 })
 
 export async function signIn(c: Context, user: SessionUser) {
@@ -118,7 +128,12 @@ export default app()
       }>()
       if (!owner) throw new HTTPException(500, {message: "Owner account missing"})
       return c.json(
-        await signIn(c, {...owner, avatarKey: owner.avatar_key, discordId: owner.discord_id}),
+        await signIn(c, {
+          ...owner,
+          avatarKey: owner.avatar_key,
+          discordId: owner.discord_id,
+          trusted: true,
+        }),
       )
     },
   )
@@ -152,6 +167,7 @@ export default app()
       color: pickColor(),
       avatarKey: null,
       discordId: null,
+      trusted: true,
     }
     await consumeInvite(c.env.DB, tokenHash)
     if (avatar instanceof File && avatar.size > 0) {
@@ -168,7 +184,7 @@ export default app()
   .get("/auth/me", async (c) => {
     const user = await getSession(c)
     if (!user) throw new HTTPException(401, {message: "Not signed in"})
-    return c.json(me(c, user))
+    return c.json(await me(c, user))
   })
 
   .post("/auth/logout", async (c) => {
@@ -179,7 +195,7 @@ export default app()
   })
 
   .post("/auth/logout-all", async (c) => {
-    const user = await requireAdmin(c)
+    const user = await requireUser(c)
     await deleteUserSessions(c.env.DB, user.id)
     clearSessionCookie(c)
     return c.body(null, 204)

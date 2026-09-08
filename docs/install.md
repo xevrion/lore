@@ -142,6 +142,38 @@ above; Discord only changes how a friend proves it is them.
 
 For local development put both values in `.dev.vars` instead.
 
+## Optional: members from your Discord server
+
+Invites make admins, and admins can do anything. If you want the whole server to be
+able to contribute without handing everyone the keys, name the server:
+
+```jsonc
+"DISCORD_GUILD_ID": "123456789012345678",
+```
+
+Find the ID in Discord under Server Settings, Widget, or right-click the server name
+with developer mode on. Deploy again. From then on, anyone in that server can press
+"Continue with Discord" on the login page and gets in as a member, no invite needed.
+Discord login must already be set up for this to work.
+
+What a member can do:
+
+- Upload within a quota, 200 MB and 20 uploads a day by default
+  (`MEMBER_QUOTA_BYTES`, `MEMBER_DAILY_UPLOADS`), with GIFs capped at 5 MB.
+- Edit and delete only their own memes.
+- Nothing on the admin page.
+
+New members are reviewed: their uploads wait in a queue at the top of `/admin` until
+an admin approves them, and only then get a link. After ten approvals a member is
+trusted and uploads go straight to the wall. Any admin can flip that back per person.
+
+Everyone, signed in or not, can report a meme from its menu. Two reports from different
+addresses hide it until an admin approves or deletes it. And any admin can ban a
+member, which deletes everything they uploaded, kills every link to it and locks the
+Discord account out for good. Only the owner can ban another admin.
+
+Leave `DISCORD_GUILD_ID` empty and none of this exists: the instance stays invite-only.
+
 ## Local development
 
 ```sh

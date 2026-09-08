@@ -3,7 +3,7 @@ import {useQueryClient} from "@tanstack/react-query"
 import {lazy, Suspense, useCallback, useEffect, useRef, useState} from "react"
 import type {ReactNode} from "react"
 
-import {memesQueryKey, useMe} from "@/api"
+import {isStaff, memesQueryKey, useMe} from "@/api"
 import {MemeCard} from "@/components/meme-card"
 import {Button} from "@/components/ui/button"
 import {Skeleton} from "@/components/ui/skeleton"
@@ -11,6 +11,7 @@ import {useMemeList} from "@/lib/uploads"
 
 const EditMemeDialog = lazy(() => import("@/components/edit-meme-dialog"))
 const DeleteMemeDialog = lazy(() => import("@/components/delete-meme-dialog"))
+const ReportMemeDialog = lazy(() => import("@/components/report-meme-dialog"))
 
 const EAGER = 12
 
@@ -30,6 +31,7 @@ export function MemeGrid({
   const list = useMemeList(sort, q)
   const [editing, setEditing] = useState<Meme | null>(null)
   const [deleting, setDeleting] = useState<Meme | null>(null)
+  const [reporting, setReporting] = useState<Meme | null>(null)
   const sentinel = useRef<HTMLDivElement>(null)
 
   const {fetchNextPage, hasNextPage, isFetchingNextPage} = list
@@ -137,10 +139,13 @@ export function MemeGrid({
             meme={meme}
             eager={i < EAGER}
             stagger={staggers[i] ?? 0}
-            canEdit={Boolean(me)}
+            canEdit={
+              isStaff(me) || (me !== null && me !== undefined && me.id === meme.uploader.id)
+            }
             onCopied={onCopied}
             onEdit={setEditing}
             onDelete={setDeleting}
+            onReport={setReporting}
           />
         ))}
       </div>
@@ -162,6 +167,7 @@ export function MemeGrid({
             }}
           />
         )}
+        {reporting && <ReportMemeDialog meme={reporting} onClose={() => setReporting(null)} />}
         {deleting && (
           <DeleteMemeDialog
             meme={deleting}

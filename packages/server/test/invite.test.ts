@@ -106,7 +106,7 @@ describe("invites", () => {
       200,
     )
     expect(
-      (await SELF.fetch(`${ORIGIN}/api/admin/users`, {headers: {cookie: sam}})).status,
+      (await SELF.fetch(`${ORIGIN}/api/admin/invites`, {headers: {cookie: sam}})).status,
     ).toBe(403)
 
     const revoke = await SELF.fetch(`${ORIGIN}/api/admin/users/${id}/revoke`, {

@@ -113,6 +113,11 @@ export default function Login() {
               <DiscordMark className="size-4" />
               Continue with Discord
             </a>
+            {config.members && !oauthError && (
+              <p className="text-center text-xs text-muted-foreground">
+                Members of the Discord server can sign in directly.
+              </p>
+            )}
             {oauthError && (
               <p role="alert" className="text-center text-sm text-destructive">
                 {oauthError}

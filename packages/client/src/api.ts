@@ -76,7 +76,21 @@ export const api = {
   cancelInvite: (tokenHash: string) =>
     request<void>(`/admin/invites/${tokenHash}`, {method: "DELETE"}),
   revokeUser: (id: string) => request<void>(`/admin/users/${id}/revoke`, {method: "POST"}),
+
+  reportMeme: (id: string) => request<void>(`/memes/${id}/report`, {method: "POST"}),
+  review: (cursor?: string | null) =>
+    request<MemeList>(`/admin/review${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  reviewFileUrl: (id: string) => `/api/admin/memes/${id}/file`,
+  approveMeme: (id: string) => request<Meme>(`/admin/memes/${id}/approve`, {method: "POST"}),
+  hideMeme: (id: string) => request<Meme>(`/admin/memes/${id}/hide`, {method: "POST"}),
+  trustUser: (id: string, trusted: boolean) =>
+    request<void>(`/admin/users/${id}/trust`, json("POST", {trusted})),
+  banUser: (id: string) =>
+    request<{deleted: number}>(`/admin/users/${id}/ban`, {method: "POST"}),
 }
+
+// Staff are owners and admins. Members upload within a quota and only touch their own memes.
+export const isStaff = (me: Me | null | undefined) => Boolean(me && me.role !== "member")
 
 // Fire and forget. sendBeacon survives navigation and never blocks the copy toast.
 export function recordCopy(id: string) {
