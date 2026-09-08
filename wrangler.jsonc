@@ -28,7 +28,7 @@
     {
       "binding": "DB",
       "database_name": "lore",
-      "database_id": "REPLACE_WITH_YOUR_DATABASE_ID",
+      "database_id": "9caf93e2-16b9-4080-a87c-232a14732bfc",
       "migrations_dir": "migrations",
     },
   ],
